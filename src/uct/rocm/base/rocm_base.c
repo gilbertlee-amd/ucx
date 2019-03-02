@@ -21,12 +21,15 @@ static struct agents {
 
 int uct_rocm_base_get_gpu_agents(hsa_agent_t **agents)
 {
+    START_TRACE();
     *agents = uct_rocm_base_agents.gpu_agents;
+    STOP_TRACE();
     return uct_rocm_base_agents.num_gpu;
 }
 
 static hsa_status_t uct_rocm_hsa_agent_callback(hsa_agent_t agent, void* data)
 {
+    START_TRACE();
     hsa_device_type_t device_type;
 
     assert(uct_rocm_base_agents.num < MAX_AGENTS);
@@ -46,11 +49,13 @@ static hsa_status_t uct_rocm_hsa_agent_callback(hsa_agent_t agent, void* data)
     }
 
     uct_rocm_base_agents.agents[uct_rocm_base_agents.num++] = agent;
+    STOP_TRACE();
     return HSA_STATUS_SUCCESS;
 }
 
 hsa_status_t uct_rocm_base_init(void)
 {
+    START_TRACE();
     static pthread_mutex_t rocm_init_mutex = PTHREAD_MUTEX_INITIALIZER;
     static volatile int rocm_ucx_initialized = 0;
     hsa_status_t status;
@@ -63,6 +68,7 @@ hsa_status_t uct_rocm_base_init(void)
     } else  {
         ucs_error("Could not take mutex");
         status = HSA_STATUS_ERROR;
+        STOP_TRACE();
         return status;
     }
 
@@ -82,35 +88,44 @@ hsa_status_t uct_rocm_base_init(void)
 
 end:
     pthread_mutex_unlock(&rocm_init_mutex);
+    STOP_TRACE();
     return status;
 }
 
 hsa_agent_t uct_rocm_base_get_dev_agent(int dev_num)
 {
+    START_TRACE();
     assert(dev_num < uct_rocm_base_agents.num);
+    STOP_TRACE();
     return uct_rocm_base_agents.agents[dev_num];
 }
 
 int uct_rocm_base_get_dev_num(hsa_agent_t agent)
 {
+    START_TRACE();
     int i;
 
     for (i = 0; i < uct_rocm_base_agents.num; i++) {
         if (uct_rocm_base_agents.agents[i].handle == agent.handle)
+            STOP_TRACE();
             return i;
     }
     assert(0);
+    STOP_TRACE();
     return -1;
 }
 
 int uct_rocm_base_is_gpu_agent(hsa_agent_t agent)
 {
+    START_TRACE();
     int i;
 
     for (i = 0; i < uct_rocm_base_agents.num_gpu; i++) {
         if (uct_rocm_base_agents.gpu_agents[i].handle == agent.handle)
+            STOP_TRACE();
             return 1;
     }
+    STOP_TRACE();
     return 0;
 }
 
@@ -118,6 +133,7 @@ hsa_status_t uct_rocm_base_lock_ptr(void *ptr, size_t size, void **lock_ptr,
                                     void **base_ptr, size_t *base_size,
                                     hsa_agent_t *agent)
 {
+    START_TRACE();
     hsa_status_t status;
     hsa_amd_pointer_info_t info;
 
@@ -125,6 +141,7 @@ hsa_status_t uct_rocm_base_lock_ptr(void *ptr, size_t size, void **lock_ptr,
     status = hsa_amd_pointer_info(ptr, &info, NULL, NULL, NULL);
     if (status != HSA_STATUS_SUCCESS) {
         ucs_error("get pointer info fail %p", ptr);
+        STOP_TRACE();
         return status;
     }
 
@@ -137,32 +154,38 @@ hsa_status_t uct_rocm_base_lock_ptr(void *ptr, size_t size, void **lock_ptr,
             *base_ptr = info.agentBaseAddress;
         if (base_size)
             *base_size = info.sizeInBytes;
+        STOP_TRACE();
         return HSA_STATUS_SUCCESS;
     }
 
     status = hsa_amd_memory_lock(ptr, size, NULL, 0, lock_ptr);
     if (status != HSA_STATUS_SUCCESS)
         ucs_error("lock user mem fail");
-
+    STOP_TRACE();
     return status;
 }
 
 int uct_rocm_base_is_mem_type_owned(uct_md_h md, void *addr, size_t length)
 {
+    START_TRACE();
     hsa_status_t status;
     hsa_amd_pointer_info_t info;
 
     if (addr == NULL) {
+        STOP_TRACE();
         return 0;
     }
 
     info.size = sizeof(hsa_amd_pointer_info_t);
     status = hsa_amd_pointer_info(addr, &info, NULL, NULL, NULL);
+    STOP_TRACE();
     return status == HSA_STATUS_SUCCESS && info.type != HSA_EXT_POINTER_TYPE_UNKNOWN;
 }
 
 UCS_MODULE_INIT() {
+    START_TRACE();
     UCS_MODULE_FRAMEWORK_DECLARE(uct_rocm);
     UCS_MODULE_FRAMEWORK_LOAD(uct_rocm);
+    STOP_TRACE();
     return UCS_OK;
 }

@@ -13,6 +13,7 @@
 
 static size_t ucp_rma_sw_put_pack_cb(void *dest, void *arg)
 {
+    START_TRACE();
     ucp_request_t *req  = arg;
     ucp_ep_t *ep        = req->send.ep;
     ucp_put_hdr_t *puth = dest;
@@ -26,12 +27,13 @@ static size_t ucp_rma_sw_put_pack_cb(void *dest, void *arg)
     length = ucs_min(req->send.length,
                      ucp_ep_config(ep)->am.max_bcopy - sizeof(*puth));
     memcpy(puth + 1, req->send.buffer, length);
-
+    STOP_TRACE();
     return sizeof(*puth) + length;
 }
 
 static ucs_status_t ucp_rma_sw_progress_put(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
     ssize_t packed_len;
@@ -48,12 +50,15 @@ static ucs_status_t ucp_rma_sw_progress_put(uct_pending_req_t *self)
         status = (ucs_status_t)packed_len;
     }
 
-    return ucp_rma_request_advance(req, packed_len - sizeof(ucp_put_hdr_t),
+    ucs_status_t result = ucp_rma_request_advance(req, packed_len - sizeof(ucp_put_hdr_t),
                                    status);
+    STOP_TRACE();
+    return result;
 }
 
 static size_t ucp_rma_sw_get_req_pack_cb(void *dest, void *arg)
 {
+    START_TRACE();
     ucp_request_t *req         = arg;
     ucp_get_req_hdr_t *getreqh = dest;
 
@@ -62,12 +67,13 @@ static size_t ucp_rma_sw_get_req_pack_cb(void *dest, void *arg)
     getreqh->req.ep_ptr   = ucp_ep_dest_ep_ptr(req->send.ep);
     getreqh->req.reqptr  = (uintptr_t)req;
     ucs_assert(getreqh->req.ep_ptr != 0);
-
+    STOP_TRACE();
     return sizeof(*getreqh);
 }
 
 static ucs_status_t ucp_rma_sw_progress_get(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
     ucs_status_t status;
@@ -82,12 +88,14 @@ static ucs_status_t ucp_rma_sw_progress_get(uct_pending_req_t *self)
         if (status != UCS_ERR_NO_RESOURCE) {
             ucp_request_complete_send(req, status);
         }
+        STOP_TRACE();
         return status;
     }
 
     /* get request packet sent, complete the request object when all data arrives */
     ucs_assert(packed_len == sizeof(ucp_get_req_hdr_t));
     ucp_ep_rma_remote_request_sent(ep);
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -99,15 +107,18 @@ ucp_rma_proto_t ucp_rma_sw_proto = {
 
 static size_t ucp_rma_sw_pack_rma_ack(void *dest, void *arg)
 {
+    START_TRACE();
     ucp_cmpl_hdr_t *hdr = dest;
     ucp_request_t *req = arg;
 
     hdr->ep_ptr = ucp_ep_dest_ep_ptr(req->send.ep);
+    STOP_TRACE();
     return sizeof(*hdr);
 }
 
 static ucs_status_t ucp_progress_rma_cmpl(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
     ssize_t packed_len;
@@ -117,16 +128,19 @@ static ucs_status_t ucp_progress_rma_cmpl(uct_pending_req_t *self)
     packed_len = uct_ep_am_bcopy(ep->uct_eps[req->send.lane], UCP_AM_ID_CMPL,
                                  ucp_rma_sw_pack_rma_ack, req, 0);
     if (packed_len < 0) {
+        STOP_TRACE();
         return (ucs_status_t)packed_len;
     }
 
     ucs_assert(packed_len == sizeof(ucp_cmpl_hdr_t));
     ucp_request_put(req);
+    STOP_TRACE();
     return UCS_OK;
 }
 
 void ucp_rma_sw_send_cmpl(ucp_ep_h ep)
 {
+    START_TRACE();
     ucp_request_t *req;
 
     req = ucp_request_get(ep->worker);
@@ -135,32 +149,38 @@ void ucp_rma_sw_send_cmpl(ucp_ep_h ep)
     req->send.ep       = ep;
     req->send.uct.func = ucp_progress_rma_cmpl;
     ucp_request_send(req, 0);
+    STOP_TRACE();
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_put_handler, (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
+    START_TRACE();
     ucp_put_hdr_t *puth = data;
     ucp_worker_h worker = arg;
 
     memcpy((void*)puth->address, puth + 1, length - sizeof(*puth));
     ucp_rma_sw_send_cmpl(ucp_worker_get_ep_by_ptr(worker, puth->ep_ptr));
+    STOP_TRACE();
     return UCS_OK;
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_rma_cmpl_handler, (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
+    START_TRACE();
     ucp_cmpl_hdr_t *putackh = data;
     ucp_worker_h worker     = arg;
     ucp_ep_h ep             = ucp_worker_get_ep_by_ptr(worker, putackh->ep_ptr);
 
     ucp_ep_rma_remote_request_completed(ep);
+    STOP_TRACE();
     return UCS_OK;
 }
 
 static size_t ucp_rma_sw_pack_get_reply(void *dest, void *arg)
 {
+    START_TRACE();
     ucp_rma_rep_hdr_t *hdr = dest;
     ucp_request_t *req    = arg;
     size_t length;
@@ -169,12 +189,13 @@ static size_t ucp_rma_sw_pack_get_reply(void *dest, void *arg)
                        ucp_ep_config(req->send.ep)->am.max_bcopy - sizeof(*hdr));
     hdr->req = req->send.get_reply.req;
     memcpy(hdr + 1, req->send.buffer, length);
-
+    STOP_TRACE();
     return sizeof(*hdr) + length;
 }
 
 static ucs_status_t ucp_progress_get_reply(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
     ssize_t packed_len, payload_len;
@@ -183,6 +204,7 @@ static ucs_status_t ucp_progress_get_reply(uct_pending_req_t *self)
     packed_len = uct_ep_am_bcopy(ep->uct_eps[req->send.lane], UCP_AM_ID_GET_REP,
                                  ucp_rma_sw_pack_get_reply, req, 0);
     if (packed_len < 0) {
+        STOP_TRACE();
         return (ucs_status_t)packed_len;
     }
 
@@ -194,8 +216,10 @@ static ucs_status_t ucp_progress_get_reply(uct_pending_req_t *self)
 
     if (req->send.length == 0) {
         ucp_request_put(req);
+        STOP_TRACE();
         return UCS_OK;
     } else {
+        STOP_TRACE();
         return UCS_INPROGRESS;
     }
 }
@@ -203,6 +227,7 @@ static ucs_status_t ucp_progress_get_reply(uct_pending_req_t *self)
 UCS_PROFILE_FUNC(ucs_status_t, ucp_get_req_handler, (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
+    START_TRACE();
     ucp_get_req_hdr_t *getreqh = data;
     ucp_worker_h worker        = arg;
     ucp_ep_h ep                = ucp_worker_get_ep_by_ptr(worker,
@@ -219,12 +244,14 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_get_req_handler, (arg, data, length, am_flags
     req->send.uct.func      = ucp_progress_get_reply;
 
     ucp_request_send(req, 0);
+    STOP_TRACE();
     return UCS_OK;
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_get_rep_handler, (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
+    START_TRACE();
     ucp_rma_rep_hdr_t *getreph = data;
     size_t frag_length         = length - sizeof(*getreph);
     ucp_request_t *req         = (ucp_request_t*)getreph->req;
@@ -236,7 +263,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_get_rep_handler, (arg, data, length, am_flags
     if (ucp_rma_request_advance(req, frag_length, UCS_OK) == UCS_OK) {
         ucp_ep_rma_remote_request_completed(ep);
     }
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -244,6 +271,7 @@ static void ucp_rma_sw_dump_packet(ucp_worker_h worker, uct_am_trace_type_t type
                                    uint8_t id, const void *data, size_t length,
                                    char *buffer, size_t max)
 {
+    START_TRACE();
     const ucp_get_req_hdr_t *geth;
     const ucp_rma_rep_hdr_t *reph;
     const ucp_cmpl_hdr_t *cmplh;
@@ -279,6 +307,7 @@ static void ucp_rma_sw_dump_packet(ucp_worker_h worker, uct_am_trace_type_t type
     p = buffer + strlen(buffer);
     ucp_dump_payload(worker->context, p, buffer + max - p, data + header_len,
                      length - header_len);
+    STOP_TRACE();
 }
 
 UCP_DEFINE_AM(UCP_FEATURE_RMA, UCP_AM_ID_PUT, ucp_put_handler,

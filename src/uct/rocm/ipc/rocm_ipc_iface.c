@@ -22,6 +22,8 @@ static ucs_config_field_t uct_rocm_ipc_iface_config_table[] = {
 
 static uint64_t uct_rocm_ipc_iface_node_guid(uct_base_iface_t *iface)
 {
+    START_TRACE();
+    STOP_TRACE();
     return ucs_machine_guid() *
            ucs_string_to_id(iface->md->component->name);
 }
@@ -29,16 +31,20 @@ static uint64_t uct_rocm_ipc_iface_node_guid(uct_base_iface_t *iface)
 ucs_status_t uct_rocm_ipc_iface_get_device_address(uct_iface_t *tl_iface,
                                                    uct_device_addr_t *addr)
 {
+    START_TRACE();
     uct_base_iface_t *iface = ucs_derived_of(tl_iface, uct_base_iface_t);
 
     *(uint64_t*)addr = uct_rocm_ipc_iface_node_guid(iface);
+    STOP_TRACE();
     return UCS_OK;
 }
 
 static ucs_status_t uct_rocm_ipc_iface_get_address(uct_iface_h tl_iface,
                                                    uct_iface_addr_t *iface_addr)
 {
+    START_TRACE();
     *(pid_t*)iface_addr = getpid();
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -46,15 +52,19 @@ static int uct_rocm_ipc_iface_is_reachable(const uct_iface_h tl_iface,
                                            const uct_device_addr_t *dev_addr,
                                            const uct_iface_addr_t *iface_addr)
 {
+    START_TRACE();
     uct_rocm_ipc_iface_t  *iface = ucs_derived_of(tl_iface, uct_rocm_ipc_iface_t);
 
-    return ((uct_rocm_ipc_iface_node_guid(&iface->super) ==
-            *((const uint64_t *)dev_addr)) && ((getpid() != *(pid_t *)iface_addr)));
+    int result = ((uct_rocm_ipc_iface_node_guid(&iface->super) ==
+                   *((const uint64_t *)dev_addr)) && ((getpid() != *(pid_t *)iface_addr)));
+    STOP_TRACE();
+    return result;
 }
 
 static ucs_status_t uct_rocm_ipc_iface_query(uct_iface_h tl_iface,
                                              uct_iface_attr_t *iface_attr)
 {
+    START_TRACE();
     memset(iface_attr, 0, sizeof(uct_iface_attr_t));
 
     iface_attr->cap.put.min_zcopy       = 0;
@@ -83,7 +93,7 @@ static ucs_status_t uct_rocm_ipc_iface_query(uct_iface_h tl_iface,
     iface_attr->latency.growth          = 0;
     iface_attr->bandwidth               = 10240 * 1024.0 * 1024.0; /* 10240 MB*/
     iface_attr->overhead                = 0.4e-6; /* 0.4 us */
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -93,6 +103,7 @@ static ucs_status_t
 uct_rocm_ipc_iface_flush(uct_iface_h tl_iface, unsigned flags,
                          uct_completion_t *comp)
 {
+    START_TRACE();
     uct_rocm_ipc_iface_t *iface = ucs_derived_of(tl_iface, uct_rocm_ipc_iface_t);
 
     if (comp != NULL) {
@@ -105,11 +116,13 @@ uct_rocm_ipc_iface_flush(uct_iface_h tl_iface, unsigned flags,
     }
 
     UCT_TL_IFACE_STAT_FLUSH_WAIT(ucs_derived_of(tl_iface, uct_base_iface_t));
+    STOP_TRACE();
     return UCS_INPROGRESS;
 }
 
 static unsigned uct_rocm_ipc_iface_progress(uct_iface_h tl_iface)
 {
+//    START_TRACE();
     uct_rocm_ipc_iface_t *iface = ucs_derived_of(tl_iface, uct_rocm_ipc_iface_t);
     static const unsigned max_signals = 16;
     unsigned count = 0;
@@ -134,7 +147,7 @@ static unsigned uct_rocm_ipc_iface_progress(uct_iface_h tl_iface)
             break;
         }
     }
-
+//    STOP_TRACE();
     return count;
 }
 
@@ -161,6 +174,7 @@ static uct_iface_ops_t uct_rocm_ipc_iface_ops = {
 
 static void uct_rocm_ipc_signal_desc_init(ucs_mpool_t *mp, void *obj, void *chunk)
 {
+    START_TRACE();
     uct_rocm_ipc_signal_desc_t *base = (uct_rocm_ipc_signal_desc_t *)obj;
     hsa_status_t status;
 
@@ -169,10 +183,12 @@ static void uct_rocm_ipc_signal_desc_init(ucs_mpool_t *mp, void *obj, void *chun
     if (status != HSA_STATUS_SUCCESS) {
         ucs_fatal("fail to create signal");
     }
+    STOP_TRACE();
 }
 
 static void uct_rocm_ipc_signal_desc_cleanup(ucs_mpool_t *mp, void *obj)
 {
+    START_TRACE();
     uct_rocm_ipc_signal_desc_t *base = (uct_rocm_ipc_signal_desc_t *)obj;
     hsa_status_t status;
 
@@ -180,6 +196,7 @@ static void uct_rocm_ipc_signal_desc_cleanup(ucs_mpool_t *mp, void *obj)
     if (status != HSA_STATUS_SUCCESS) {
         ucs_fatal("fail to destroy signal");
     }
+    STOP_TRACE();
 }
 
 static ucs_mpool_ops_t uct_rocm_ipc_signal_desc_mpool_ops = {
@@ -193,6 +210,7 @@ static UCS_CLASS_INIT_FUNC(uct_rocm_ipc_iface_t, uct_md_h md, uct_worker_h worke
                            const uct_iface_params_t *params,
                            const uct_iface_config_t *tl_config)
 {
+    START_TRACE();
     ucs_status_t status;
 
     UCS_CLASS_CALL_SUPER_INIT(uct_base_iface_t, &uct_rocm_ipc_iface_ops, md, worker,
@@ -210,11 +228,12 @@ static UCS_CLASS_INIT_FUNC(uct_rocm_ipc_iface_t, uct_md_h md, uct_worker_h worke
                             "ROCM_IPC signal objects");
     if (status != UCS_OK) {
         ucs_error("rocm/ipc signal mpool creation failed");
+        STOP_TRACE();
         return status;
     }
 
     ucs_queue_head_init(&self->signal_queue);
-
+    STOP_TRACE();
     return UCS_OK;
 }
 

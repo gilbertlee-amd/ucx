@@ -41,6 +41,8 @@ static ucs_status_t uct_rocm_copy_md_query(uct_md_h md, uct_md_attr_t *md_attr)
 static ucs_status_t uct_rocm_copy_mkey_pack(uct_md_h md, uct_mem_h memh,
                                             void *rkey_buffer)
 {
+    START_TRACE();
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -48,72 +50,89 @@ static ucs_status_t uct_rocm_copy_rkey_unpack(uct_md_component_t *mdc,
                                               const void *rkey_buffer, uct_rkey_t *rkey_p,
                                               void **handle_p)
 {
+    START_TRACE();
     *rkey_p   = 0xdeadbeef;
     *handle_p = NULL;
+    STOP_TRACE();
     return UCS_OK;
 }
 
 static ucs_status_t uct_rocm_copy_rkey_release(uct_md_component_t *mdc, uct_rkey_t rkey,
                                                void *handle)
 {
+    START_TRACE();
+    STOP_TRACE();
     return UCS_OK;
 }
 
 static ucs_status_t uct_rocm_copy_mem_reg(uct_md_h md, void *address, size_t length,
                                           unsigned flags, uct_mem_h *memh_p)
 {
+    START_TRACE();
     hsa_status_t status;
     void *lock_addr;
 
     if(address == NULL) {
         *memh_p = address;
+        STOP_TRACE();
         return UCS_OK;
     }
 
     status = hsa_amd_memory_lock(address, length, NULL, 0, &lock_addr);
     if (status != HSA_STATUS_SUCCESS) {
+        STOP_TRACE();
         return UCS_ERR_IO_ERROR;
     }
 
     *memh_p = address;
+    STOP_TRACE();
     return UCS_OK;
 }
 
 static ucs_status_t uct_rocm_copy_mem_dereg(uct_md_h md, uct_mem_h memh)
 {
+    START_TRACE();
     void *address = (void *)memh;
     hsa_status_t status;
 
     if (address == NULL) {
+        STOP_TRACE();
         return UCS_OK;
     }
 
     status = hsa_amd_memory_unlock(address);
     if (status != HSA_STATUS_SUCCESS) {
+        STOP_TRACE();
         return UCS_ERR_IO_ERROR;
     }
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
 static ucs_status_t uct_rocm_copy_query_md_resources(uct_md_resource_desc_t **resources_p,
                                                      unsigned *num_resources_p)
 {
+    START_TRACE();
     if (uct_rocm_base_init() != HSA_STATUS_SUCCESS) {
         ucs_error("Could not initialize ROCm support");
         *resources_p     = NULL;
         *num_resources_p = 0;
+        STOP_TRACE();
         return UCS_OK;
     }
 
-    return uct_single_md_resource(&uct_rocm_copy_md_component, resources_p,
-                                  num_resources_p);
+    ucs_status_t status = uct_single_md_resource(&uct_rocm_copy_md_component, resources_p,
+                                                 num_resources_p);
+    STOP_TRACE();
+    return status;
 }
 
 static void uct_rocm_copy_md_close(uct_md_h uct_md) {
+    START_TRACE();
     uct_rocm_copy_md_t *md = ucs_derived_of(uct_md, uct_rocm_copy_md_t);
 
     ucs_free(md);
+    STOP_TRACE();
 }
 
 static uct_md_ops_t md_ops = {
@@ -128,11 +147,13 @@ static uct_md_ops_t md_ops = {
 static ucs_status_t uct_rocm_copy_md_open(const char *md_name, const uct_md_config_t *md_config,
                                           uct_md_h *md_p)
 {
+    START_TRACE();
     uct_rocm_copy_md_t *md;
 
     md = ucs_malloc(sizeof(uct_rocm_copy_md_t), "uct_rocm_copy_md_t");
     if (NULL == md) {
         ucs_error("Failed to allocate memory for uct_rocm_copy_md_t");
+        STOP_TRACE();
         return UCS_ERR_NO_MEMORY;
     }
 
@@ -140,6 +161,7 @@ static ucs_status_t uct_rocm_copy_md_open(const char *md_name, const uct_md_conf
     md->super.component = &uct_rocm_copy_md_component;
 
     *md_p = (uct_md_h) md;
+    STOP_TRACE();
     return UCS_OK;
 }
 

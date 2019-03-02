@@ -14,10 +14,11 @@
 
 static UCS_CLASS_INIT_FUNC(uct_rocm_gdr_ep_t, const uct_ep_params_t *params)
 {
+    START_TRACE();
     uct_rocm_gdr_iface_t *iface = ucs_derived_of(params->iface, uct_rocm_gdr_iface_t);
 
     UCS_CLASS_CALL_SUPER_INIT(uct_base_ep_t, &iface->super);
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -37,12 +38,14 @@ ucs_status_t uct_rocm_gdr_ep_put_short(uct_ep_h tl_ep, const void *buffer,
                                        unsigned length, uint64_t remote_addr,
                                        uct_rkey_t rkey)
 {
+    START_TRACE();
     int ret;
 
     if (ucs_likely(length)) {
         ret = gdr_copy_to_bar((void *)remote_addr, buffer, length);
         if (ret) {
             ucs_error("gdr_copy_to_bar failed. ret:%d", ret);
+            STOP_TRACE();
             return UCS_ERR_IO_ERROR;
         }
     }
@@ -50,6 +53,7 @@ ucs_status_t uct_rocm_gdr_ep_put_short(uct_ep_h tl_ep, const void *buffer,
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), PUT, SHORT, length);
     ucs_trace_data("PUT_SHORT size %d from %p to %p",
                    length, buffer, (void *)remote_addr);
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -57,12 +61,14 @@ ucs_status_t uct_rocm_gdr_ep_get_short(uct_ep_h tl_ep, void *buffer,
                                        unsigned length, uint64_t remote_addr,
                                        uct_rkey_t rkey)
 {
+    START_TRACE();
     int ret;
 
     if (ucs_likely(length)) {
         ret = gdr_copy_from_bar(buffer, (void *)remote_addr, length);
         if (ret) {
             ucs_error("gdr_copy_from_bar failed. ret:%d", ret);
+            STOP_TRACE();
             return UCS_ERR_IO_ERROR;
         }
     }
@@ -70,5 +76,6 @@ ucs_status_t uct_rocm_gdr_ep_get_short(uct_ep_h tl_ep, void *buffer,
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), GET, SHORT, length);
     ucs_trace_data("GET_SHORT size %d from %p to %p",
                    length, (void *)remote_addr, buffer);
+    STOP_TRACE();
     return UCS_OK;
 }

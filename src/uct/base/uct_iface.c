@@ -12,6 +12,19 @@
 #include <ucs/async/async.h>
 #include <ucs/time/time.h>
 
+void DoTrace(char const* func, int const mode)
+{
+    static int stackDepth = 0;
+    if (mode == 0)
+    {
+        fprintf(stdout, "[UCX] %*s%s\n", ++stackDepth, "", func);
+        fflush(stdout);
+    }
+    else
+    {
+        --stackDepth;
+    }
+}
 
 #if ENABLE_STATS
 static ucs_stats_class_t uct_ep_stats_class = {

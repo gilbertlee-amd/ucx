@@ -19,6 +19,7 @@ static UCS_F_ALWAYS_INLINE void
 ucp_tag_recv_request_completed(ucp_request_t *req, ucs_status_t status,
                                ucp_tag_recv_info_t *info, const char *function)
 {
+    START_TRACE();
     ucs_trace_req("%s returning completed request %p (%p) stag 0x%"PRIx64" len %zu, %s",
                   function, req, req + 1, info->sender_tag, info->length,
                   ucs_status_string(status));
@@ -28,6 +29,7 @@ ucp_tag_recv_request_completed(ucp_request_t *req, ucs_status_t status,
         ucp_request_put(req);
     }
     UCS_PROFILE_REQUEST_EVENT(req, "complete_recv", 0);
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE void
@@ -36,6 +38,7 @@ ucp_tag_recv_common(ucp_worker_h worker, void *buffer, size_t count,
                     ucp_request_t *req, uint16_t req_flags, ucp_tag_recv_callback_t cb,
                     ucp_recv_desc_t *rdesc, const char *debug_name)
 {
+    START_TRACE();
     unsigned common_flags = UCP_REQUEST_FLAG_RECV | UCP_REQUEST_FLAG_EXPECTED;
     ucp_eager_first_hdr_t *eagerf_hdr;
     ucp_request_queue_t *req_queue;
@@ -76,6 +79,7 @@ ucp_tag_recv_common(ucp_worker_h worker, void *buffer, size_t count,
         }
         ucp_tag_recv_request_completed(req, status, &req->recv.tag.info,
                                        debug_name);
+        STOP_TRACE();
         return;
     }
 
@@ -118,6 +122,7 @@ ucp_tag_recv_common(ucp_worker_h worker, void *buffer, size_t count,
 
         ucs_trace_req("%s returning expected request %p (%p)", debug_name, req,
                       req + 1);
+        STOP_TRACE();
         return;
     }
 
@@ -126,6 +131,7 @@ ucp_tag_recv_common(ucp_worker_h worker, void *buffer, size_t count,
         ucp_rndv_matched(worker, req, (void*)(rdesc + 1));
         UCP_WORKER_STAT_RNDV(worker, UNEXP);
         ucp_recv_desc_release(rdesc);
+        STOP_TRACE();
         return;
     }
 
@@ -149,6 +155,7 @@ ucp_tag_recv_common(ucp_worker_h worker, void *buffer, size_t count,
     /* process additional fragments */
     ucp_tag_frag_list_process_queue(&worker->tm, req, msg_id
                                     UCS_STATS_ARG(UCP_WORKER_STAT_TAG_RX_EAGER_CHUNK_UNEXP));
+    STOP_TRACE();
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_recv_nbr,
@@ -157,6 +164,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_recv_nbr,
                  uintptr_t datatype, ucp_tag_t tag, ucp_tag_t tag_mask,
                  void *request)
 {
+    START_TRACE();
     ucp_request_t *req = (ucp_request_t *)request - 1;
     ucp_recv_desc_t *rdesc;
 
@@ -170,6 +178,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_recv_nbr,
                         "recv_nbr");
 
     UCP_WORKER_THREAD_CS_EXIT_CONDITIONAL(worker);
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -179,6 +188,7 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_recv_nb,
                  uintptr_t datatype, ucp_tag_t tag, ucp_tag_t tag_mask,
                  ucp_tag_recv_callback_t cb)
 {
+    START_TRACE();
     ucp_recv_desc_t *rdesc;
     ucs_status_ptr_t ret;
     ucp_request_t *req;
@@ -198,6 +208,7 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_recv_nb,
     }
 
     UCP_WORKER_THREAD_CS_EXIT_CONDITIONAL(worker);
+    STOP_TRACE();
     return ret;
 }
 
@@ -207,6 +218,7 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_msg_recv_nb,
                  uintptr_t datatype, ucp_tag_message_h message,
                  ucp_tag_recv_callback_t cb)
 {
+    START_TRACE();
     ucp_recv_desc_t *rdesc = message;
     ucs_status_ptr_t ret;
     ucp_request_t *req;
@@ -226,5 +238,6 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_msg_recv_nb,
     }
 
     UCP_WORKER_THREAD_CS_EXIT_CONDITIONAL(worker);
+    STOP_TRACE();
     return ret;
 }

@@ -12,10 +12,11 @@
 
 static UCS_CLASS_INIT_FUNC(uct_rocm_copy_ep_t, const uct_ep_params_t *params)
 {
+    START_TRACE();
     uct_rocm_copy_iface_t *iface = ucs_derived_of(params->iface, uct_rocm_copy_iface_t);
 
     UCS_CLASS_CALL_SUPER_INIT(uct_base_ep_t, &iface->super);
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -37,9 +38,11 @@ uct_rocm_copy_ep_zcopy(uct_ep_h tl_ep,
                                    const uct_iov_t *iov,
                                    int is_put)
 {
+    START_TRACE();
     size_t size = uct_iov_get_length(iov);
 
     if (!size) {
+        STOP_TRACE();
         return UCS_OK;
     }
 
@@ -47,7 +50,7 @@ uct_rocm_copy_ep_zcopy(uct_ep_h tl_ep,
         memcpy((void *)remote_addr, iov->buffer, size);
     else
         memcpy(iov->buffer, (void *)remote_addr, size);
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -55,6 +58,7 @@ ucs_status_t uct_rocm_copy_ep_get_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, si
                                         uint64_t remote_addr, uct_rkey_t rkey,
                                         uct_completion_t *comp)
 {
+    START_TRACE();
     ucs_status_t status;
 
     status = uct_rocm_copy_ep_zcopy(tl_ep, remote_addr, iov, 0);
@@ -63,6 +67,7 @@ ucs_status_t uct_rocm_copy_ep_get_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, si
                       uct_iov_total_length(iov, iovcnt));
     uct_rocm_copy_trace_data(remote_addr, rkey, "GET_ZCOPY [length %zu]",
                              uct_iov_total_length(iov, iovcnt));
+    STOP_TRACE();
     return status;
 }
 
@@ -70,6 +75,7 @@ ucs_status_t uct_rocm_copy_ep_put_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, si
                                         uint64_t remote_addr, uct_rkey_t rkey,
                                         uct_completion_t *comp)
 {
+    START_TRACE();
     ucs_status_t status;
 
     status = uct_rocm_copy_ep_zcopy(tl_ep, remote_addr, iov, 1);
@@ -78,6 +84,7 @@ ucs_status_t uct_rocm_copy_ep_put_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, si
                       uct_iov_total_length(iov, iovcnt));
     uct_rocm_copy_trace_data(remote_addr, rkey, "GET_ZCOPY [length %zu]",
                              uct_iov_total_length(iov, iovcnt));
+    STOP_TRACE();
     return status;
 
 }
@@ -87,11 +94,13 @@ ucs_status_t uct_rocm_copy_ep_put_short(uct_ep_h tl_ep, const void *buffer,
                                         unsigned length, uint64_t remote_addr,
                                         uct_rkey_t rkey)
 {
+    START_TRACE();
     memcpy((void *)remote_addr, buffer, length);
 
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), PUT, SHORT, length);
     ucs_trace_data("PUT_SHORT size %d from %p to %p",
                    length, buffer, (void *)remote_addr);
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -99,11 +108,13 @@ ucs_status_t uct_rocm_copy_ep_get_short(uct_ep_h tl_ep, void *buffer,
                                         unsigned length, uint64_t remote_addr,
                                         uct_rkey_t rkey)
 {
+    START_TRACE();
     /* device to host */
     memcpy(buffer, (void *)remote_addr, length);
 
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), GET, SHORT, length);
     ucs_trace_data("GET_SHORT size %d from %p to %p",
                    length, (void *)remote_addr, buffer);
+    STOP_TRACE();
     return UCS_OK;
 }

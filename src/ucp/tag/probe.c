@@ -17,6 +17,7 @@ ucp_tag_message_h ucp_tag_probe_nb(ucp_worker_h worker, ucp_tag_t tag,
                                    ucp_tag_t tag_mask, int remove,
                                    ucp_tag_recv_info_t *info)
 {
+    START_TRACE();
     ucp_context_h UCS_V_UNUSED context = worker->context;
     ucp_recv_desc_t *rdesc;
     uint16_t flags;
@@ -44,6 +45,6 @@ ucp_tag_message_h ucp_tag_probe_nb(ucp_worker_h worker, ucp_tag_t tag,
     }
 
     UCP_WORKER_THREAD_CS_EXIT_CONDITIONAL(worker);
-
+    STOP_TRACE();
     return rdesc;
 }

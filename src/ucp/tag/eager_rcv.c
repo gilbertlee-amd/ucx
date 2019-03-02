@@ -18,6 +18,7 @@ ucp_eager_expected_handler(ucp_worker_t *worker, ucp_request_t *req,
                            void *data, size_t recv_len, ucp_tag_t recv_tag,
                            uint16_t flags)
 {
+    START_TRACE();
     ucs_trace_req("found req %p", req);
     UCS_PROFILE_REQUEST_EVENT(req, "eager_recv", recv_len);
 
@@ -34,12 +35,14 @@ ucp_eager_expected_handler(ucp_worker_t *worker, ucp_request_t *req,
     ucp_tag_offload_try_cancel(worker, req,
                                UCP_TAG_OFFLOAD_CANCEL_FORCE |
                                UCP_TAG_OFFLOAD_CANCEL_DEREG);
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_eager_offload_handler(void *arg, void *data, size_t length,
                           unsigned tl_flags, uint16_t flags, ucp_tag_t recv_tag)
 {
+    START_TRACE();
     ucp_worker_t *worker = arg;
     ucp_request_t *req;
     ucp_recv_desc_t *rdesc;
@@ -63,7 +66,7 @@ ucp_eager_offload_handler(void *arg, void *data, size_t length,
             ucp_tag_unexp_recv(&worker->tm, rdesc, recv_tag);
         }
     }
-
+    STOP_TRACE();
     return status;
 }
 
@@ -71,6 +74,7 @@ static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_eager_tagged_handler(void *arg, void *data, size_t length, unsigned am_flags,
                          uint16_t flags, uint16_t hdr_len, uint16_t priv_length)
 {
+    START_TRACE();
     ucp_worker_h worker        = arg;
     ucp_eager_hdr_t *eager_hdr = data;
     ucp_eager_first_hdr_t *eagerf_hdr;
@@ -120,7 +124,7 @@ ucp_eager_tagged_handler(void *arg, void *data, size_t length, unsigned am_flags
             ucp_tag_unexp_recv(&worker->tm, rdesc, recv_tag);
         }
     }
-
+    STOP_TRACE();
     return status;
 }
 
@@ -128,25 +132,32 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_eager_only_handler,
                  (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
-    return ucp_eager_tagged_handler(arg, data, length, am_flags,
-                                    UCP_RECV_DESC_FLAG_EAGER |
-                                    UCP_RECV_DESC_FLAG_EAGER_ONLY,
-                                    sizeof(ucp_eager_hdr_t), 0);
+    START_TRACE();
+    ucs_status_t result = ucp_eager_tagged_handler(arg, data, length, am_flags,
+                                                   UCP_RECV_DESC_FLAG_EAGER |
+                                                   UCP_RECV_DESC_FLAG_EAGER_ONLY,
+                                                   sizeof(ucp_eager_hdr_t), 0);
+    STOP_TRACE();
+    return result;
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_eager_first_handler,
                  (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
-    return ucp_eager_tagged_handler(arg, data, length, am_flags,
-                                    UCP_RECV_DESC_FLAG_EAGER,
-                                    sizeof(ucp_eager_first_hdr_t), 0);
+    START_TRACE();
+    ucs_status_t result = ucp_eager_tagged_handler(arg, data, length, am_flags,
+                                                   UCP_RECV_DESC_FLAG_EAGER,
+                                                   sizeof(ucp_eager_first_hdr_t), 0);
+    STOP_TRACE();
+    return result;
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_eager_middle_handler,
                  (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
+    START_TRACE();
     ucp_worker_h worker         = arg;
     ucp_eager_middle_hdr_t *hdr = data;
     ucp_tag_frag_match_t *matchq;
@@ -187,7 +198,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_eager_middle_handler,
 
         status = UCS_OK;
     }
-
+    STOP_TRACE();
     return status;
 }
 
@@ -195,27 +206,34 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_eager_sync_only_handler,
                  (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
-    return ucp_eager_tagged_handler(arg, data, length, am_flags,
-                                    UCP_RECV_DESC_FLAG_EAGER|
-                                    UCP_RECV_DESC_FLAG_EAGER_ONLY|
-                                    UCP_RECV_DESC_FLAG_EAGER_SYNC,
-                                    sizeof(ucp_eager_sync_hdr_t), 0);
+    START_TRACE();
+    ucs_status_t result = ucp_eager_tagged_handler(arg, data, length, am_flags,
+                                                   UCP_RECV_DESC_FLAG_EAGER|
+                                                   UCP_RECV_DESC_FLAG_EAGER_ONLY|
+                                                   UCP_RECV_DESC_FLAG_EAGER_SYNC,
+                                                   sizeof(ucp_eager_sync_hdr_t), 0);
+    STOP_TRACE();
+    return result;
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_eager_sync_first_handler,
                  (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
-    return ucp_eager_tagged_handler(arg, data, length, am_flags,
-                                    UCP_RECV_DESC_FLAG_EAGER|
-                                    UCP_RECV_DESC_FLAG_EAGER_SYNC,
-                                    sizeof(ucp_eager_sync_first_hdr_t), 0);
+    START_TRACE();
+    ucs_status_t result = ucp_eager_tagged_handler(arg, data, length, am_flags,
+                                                   UCP_RECV_DESC_FLAG_EAGER|
+                                                   UCP_RECV_DESC_FLAG_EAGER_SYNC,
+                                                   sizeof(ucp_eager_sync_first_hdr_t), 0);
+    STOP_TRACE();
+    return result;
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_eager_offload_sync_ack_handler,
                  (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
+    START_TRACE();
     ucp_offload_ssend_hdr_t *rep_hdr = data;
     ucp_worker_t *worker             = arg;
     ucs_queue_head_t *queue          = &worker->tm.offload.sync_reqs;
@@ -228,11 +246,13 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_eager_offload_sync_ack_handler,
             ucp_tag_eager_sync_completion(sreq, UCP_REQUEST_FLAG_REMOTE_COMPLETED,
                                           UCS_OK);
             ucs_queue_del_iter(queue, iter);
+            STOP_TRACE();
             return UCS_OK;
         }
     }
     ucs_error("unexpected sync ack received: tag %"PRIx64" ep_ptr 0x%lx",
               rep_hdr->sender_tag, rep_hdr->ep_ptr);
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -240,11 +260,13 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_eager_sync_ack_handler,
                  (arg, data, length, am_flags),
                  void *arg, void *data, size_t length, unsigned am_flags)
 {
+    START_TRACE();
     ucp_reply_hdr_t *rep_hdr = data;
     ucp_request_t *req;
 
     req = (ucp_request_t*)rep_hdr->reqptr;
     ucp_tag_eager_sync_completion(req, UCP_REQUEST_FLAG_REMOTE_COMPLETED, UCS_OK);
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -253,6 +275,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_offload_unexp_eager,
                  void *arg, void *data, size_t length, unsigned tl_flags,
                  uct_tag_t stag, uint64_t imm)
 {
+    START_TRACE();
     /* Align data with AM protocol. We should add tag before the data. */
     ucp_worker_iface_t *wiface = arg;
     uint16_t flags             = UCP_RECV_DESC_FLAG_EAGER |
@@ -260,14 +283,16 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_offload_unexp_eager,
                                  UCP_RECV_DESC_FLAG_EAGER_OFFLOAD;
     ucp_eager_sync_hdr_t *hdr;
     int hdr_len;
-
+    ucs_status_t result;
     UCP_WORKER_STAT_TAG_OFFLOAD(wiface->worker, RX_UNEXP_EGR);
 
     ucp_tag_offload_unexp(wiface, stag, length);
 
     if (ucs_likely(!imm)) {
-        return ucp_eager_offload_handler(wiface->worker, data, length, tl_flags,
-                                         flags, stag);
+        result = ucp_eager_offload_handler(wiface->worker, data, length, tl_flags,
+                                           flags, stag);
+        STOP_TRACE();
+        return result;
     }
 
     /* It is a sync send, imm data contains sender uuid */
@@ -286,14 +311,17 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_offload_unexp_eager,
     hdr->req.ep_ptr      = imm;
     flags               |= UCP_RECV_DESC_FLAG_EAGER_SYNC;
 
-    return ucp_eager_tagged_handler(wiface->worker, hdr, length + hdr_len,
-                                    tl_flags, flags, hdr_len, hdr_len);
+    result = ucp_eager_tagged_handler(wiface->worker, hdr, length + hdr_len,
+                                      tl_flags, flags, hdr_len, hdr_len);
+    STOP_TRACE();
+    return result;
 }
 
 static void ucp_eager_dump(ucp_worker_h worker, uct_am_trace_type_t type,
                            uint8_t id, const void *data, size_t length,
                            char *buffer, size_t max)
 {
+    START_TRACE();
     const ucp_eager_first_hdr_t *eager_first_hdr = data;
     const ucp_eager_hdr_t *eager_hdr             = data;
     const ucp_eager_middle_hdr_t *eager_mid_hdr  = data;
@@ -354,6 +382,7 @@ static void ucp_eager_dump(ucp_worker_h worker, uct_am_trace_type_t type,
     p = buffer + strlen(buffer);
     ucp_dump_payload(worker->context, p, buffer + max - p, data + header_len,
                      length - header_len);
+    STOP_TRACE();
 }
 
 UCP_DEFINE_AM(UCP_FEATURE_TAG, UCP_AM_ID_EAGER_ONLY, ucp_eager_only_handler,

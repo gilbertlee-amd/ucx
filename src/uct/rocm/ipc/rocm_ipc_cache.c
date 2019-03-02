@@ -15,14 +15,19 @@
 
 static ucs_pgt_dir_t *uct_rocm_ipc_cache_pgt_dir_alloc(const ucs_pgtable_t *pgtable)
 {
-    return ucs_memalign(UCS_PGT_ENTRY_MIN_ALIGN, sizeof(ucs_pgt_dir_t),
-                        "rocm_ipc_cache_pgdir");
+    START_TRACE();
+    ucs_pgt_dir_t* result = ucs_memalign(UCS_PGT_ENTRY_MIN_ALIGN, sizeof(ucs_pgt_dir_t),
+                                        "rocm_ipc_cache_pgdir");
+    STOP_TRACE();
+    return result;
 }
 
 static void uct_rocm_ipc_cache_pgt_dir_release(const ucs_pgtable_t *pgtable,
                                                ucs_pgt_dir_t *dir)
 {
+    START_TRACE();
     ucs_free(dir);
+    STOP_TRACE();
 }
 
 static void
@@ -30,15 +35,18 @@ uct_rocm_ipc_cache_region_collect_callback(const ucs_pgtable_t *pgtable,
                                            ucs_pgt_region_t *pgt_region,
                                            void *arg)
 {
+    START_TRACE();
     ucs_list_link_t *list = arg;
     uct_rocm_ipc_cache_region_t *region;
 
     region = ucs_derived_of(pgt_region, uct_rocm_ipc_cache_region_t);
     ucs_list_add_tail(list, &region->list);
+    STOP_TRACE();
 }
 
 static void uct_rocm_ipc_cache_purge(uct_rocm_ipc_cache_t *cache)
 {
+    START_TRACE();
     uct_rocm_ipc_cache_region_t *region, *tmp;
     ucs_list_link_t region_list;
 
@@ -55,11 +63,13 @@ static void uct_rocm_ipc_cache_purge(uct_rocm_ipc_cache_t *cache)
     }
 
     ucs_trace("%s: rocm ipc cache purged", cache->name);
+    STOP_TRACE();
 }
 
 static void uct_rocm_ipc_cache_invalidate_regions(uct_rocm_ipc_cache_t *cache,
                                                   void *from, void *to)
 {
+    START_TRACE();
     ucs_list_link_t region_list;
     ucs_status_t status;
     uct_rocm_ipc_cache_region_t *region, *tmp;
@@ -83,11 +93,13 @@ static void uct_rocm_ipc_cache_invalidate_regions(uct_rocm_ipc_cache_t *cache,
     }
     ucs_trace("%s: closed memhandles in the range [%p..%p]",
               cache->name, from, to);
+    STOP_TRACE();
 }
 
 ucs_status_t uct_rocm_ipc_cache_map_memhandle(void *arg, uct_rocm_ipc_key_t *key,
                                               void **mapped_addr)
 {
+    START_TRACE();
     uct_rocm_ipc_cache_t *cache = (uct_rocm_ipc_cache_t *)arg;
     ucs_status_t status;
     ucs_pgt_region_t *pgt_region;
@@ -173,15 +185,18 @@ ucs_status_t uct_rocm_ipc_cache_map_memhandle(void *arg, uct_rocm_ipc_key_t *key
               cache->name, UCS_PGT_REGION_ARG(&region->super), key->length);
 
     pthread_rwlock_unlock(&cache->lock);
+    STOP_TRACE();
     return UCS_OK;
 err:
     pthread_rwlock_unlock(&cache->lock);
+    STOP_TRACE();
     return status;
 }
 
 ucs_status_t uct_rocm_ipc_create_cache(uct_rocm_ipc_cache_t **cache,
                                        const char *name)
 {
+    START_TRACE();
     ucs_status_t status;
     uct_rocm_ipc_cache_t *cache_desc;
     int ret;
@@ -189,6 +204,7 @@ ucs_status_t uct_rocm_ipc_create_cache(uct_rocm_ipc_cache_t **cache,
     cache_desc = ucs_malloc(sizeof(uct_rocm_ipc_cache_t), "uct_rocm_ipc_cache_t");
     if (cache_desc == NULL) {
         ucs_error("failed to allocate memory for rocm_ipc cache");
+        STOP_TRACE();
         return UCS_ERR_NO_MEMORY;
     }
 
@@ -213,20 +229,24 @@ ucs_status_t uct_rocm_ipc_create_cache(uct_rocm_ipc_cache_t **cache,
     }
 
     *cache = cache_desc;
+    STOP_TRACE();
     return UCS_OK;
 
 err_destroy_rwlock:
     pthread_rwlock_destroy(&cache_desc->lock);
 err:
     free(cache_desc);
+    STOP_TRACE();
     return status;
 }
 
 void uct_rocm_ipc_destroy_cache(uct_rocm_ipc_cache_t *cache)
 {
+    START_TRACE();
     uct_rocm_ipc_cache_purge(cache);
     ucs_pgtable_cleanup(&cache->pgtable);
     pthread_rwlock_destroy(&cache->lock);
     free(cache->name);
     ucs_free(cache);
+    STOP_TRACE();
 }

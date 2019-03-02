@@ -26,9 +26,11 @@ static void UCS_CLASS_DELETE_FUNC_NAME(uct_rocm_gdr_iface_t)(uct_iface_t*);
 static ucs_status_t uct_rocm_gdr_iface_get_address(uct_iface_h tl_iface,
                                                    uct_iface_addr_t *iface_addr)
 {
+    START_TRACE();
     uct_rocm_gdr_iface_t *iface = ucs_derived_of(tl_iface, uct_rocm_gdr_iface_t);
 
     *(uct_rocm_gdr_iface_addr_t*)iface_addr = iface->id;
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -36,15 +38,17 @@ static int uct_rocm_gdr_iface_is_reachable(const uct_iface_h tl_iface,
                                            const uct_device_addr_t *dev_addr,
                                            const uct_iface_addr_t *iface_addr)
 {
+    START_TRACE();
     uct_rocm_gdr_iface_t  *iface = ucs_derived_of(tl_iface, uct_rocm_gdr_iface_t);
     uct_rocm_gdr_iface_addr_t *addr = (uct_rocm_gdr_iface_addr_t*)iface_addr;
-
+    STOP_TRACE();
     return (addr != NULL) && (iface->id == *addr);
 }
 
 static ucs_status_t uct_rocm_gdr_iface_query(uct_iface_h iface,
                                              uct_iface_attr_t *iface_attr)
 {
+    START_TRACE();
     memset(iface_attr, 0, sizeof(uct_iface_attr_t));
 
     iface_attr->iface_addr_len          = sizeof(uct_rocm_gdr_iface_addr_t);
@@ -84,7 +88,7 @@ static ucs_status_t uct_rocm_gdr_iface_query(uct_iface_h iface,
     iface_attr->bandwidth               = 6911 * 1024.0 * 1024.0;
     iface_attr->overhead                = 0;
     iface_attr->priority                = 0;
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -137,11 +141,13 @@ static ucs_status_t uct_rocm_gdr_query_tl_resources(uct_md_h md,
                                                     uct_tl_resource_desc_t **resource_p,
                                                     unsigned *num_resources_p)
 {
+    START_TRACE();
     uct_tl_resource_desc_t *resource;
 
     resource = ucs_calloc(1, sizeof(uct_tl_resource_desc_t), "ROCm copy resource desc");
     if (NULL == resource) {
         ucs_error("Failed to allocate memory");
+        STOP_TRACE();
         return UCS_ERR_NO_MEMORY;
     }
 
@@ -154,6 +160,7 @@ static ucs_status_t uct_rocm_gdr_query_tl_resources(uct_md_h md,
 
     *num_resources_p = 1;
     *resource_p = resource;
+    STOP_TRACE();
     return UCS_OK;
 }
 

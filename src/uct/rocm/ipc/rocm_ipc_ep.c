@@ -13,6 +13,7 @@
 
 static UCS_CLASS_INIT_FUNC(uct_rocm_ipc_ep_t, const uct_ep_params_t *params)
 {
+    START_TRACE();
     uct_rocm_ipc_iface_t *iface = ucs_derived_of(params->iface, uct_rocm_ipc_iface_t);
     char target_name[64];
     ucs_status_t status;
@@ -26,15 +27,18 @@ static UCS_CLASS_INIT_FUNC(uct_rocm_ipc_ep_t, const uct_ep_params_t *params)
     if (status != UCS_OK) {
         ucs_error("could not create create rocm ipc cache: %s",
                   ucs_status_string(status));
+        STOP_TRACE();
         return status;
     }
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
 static UCS_CLASS_CLEANUP_FUNC(uct_rocm_ipc_ep_t)
 {
+    START_TRACE();
     uct_rocm_ipc_destroy_cache(self->remote_memh_cache);
+    STOP_TRACE();
 }
 
 UCS_CLASS_DEFINE(uct_rocm_ipc_ep_t, uct_base_ep_t);
@@ -52,6 +56,7 @@ ucs_status_t uct_rocm_ipc_ep_zcopy(uct_ep_h tl_ep,
                                    uct_completion_t *comp,
                                    int is_put)
 {
+    START_TRACE();
     uct_rocm_ipc_ep_t *ep = ucs_derived_of(tl_ep, uct_rocm_ipc_ep_t);
     hsa_status_t status;
     hsa_agent_t local_agent, remote_agent;
@@ -61,19 +66,26 @@ ucs_status_t uct_rocm_ipc_ep_zcopy(uct_ep_h tl_ep,
 
     /* no data to deliver */
     if (!size)
+    {
+        STOP_TRACE();
         return UCS_OK;
+    }
 
     if ((remote_addr < key->address) ||
         (remote_addr + size > key->address + key->length)) {
         ucs_error("remote addr %lx/%lx out of range %lx/%lx",
                   remote_addr, size, key->address, key->length);
+        STOP_TRACE();
         return UCS_ERR_INVALID_PARAM;
     }
 
     status = uct_rocm_base_lock_ptr(iov->buffer, size, &lock_addr,
                                     &base_addr, NULL, &local_agent);
     if (status != HSA_STATUS_SUCCESS)
+    {
+        STOP_TRACE();
         return status;
+    }
 
     local_addr = lock_addr ? lock_addr : iov->buffer;
 
@@ -180,7 +192,7 @@ ucs_status_t uct_rocm_ipc_ep_zcopy(uct_ep_h tl_ep,
  out_unlock:
     if (lock_addr)
         hsa_amd_memory_unlock(lock_addr);
-
+    STOP_TRACE();
     return ret;
 }
 
@@ -188,6 +200,7 @@ ucs_status_t uct_rocm_ipc_ep_put_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, siz
                                        uint64_t remote_addr, uct_rkey_t rkey,
                                        uct_completion_t *comp)
 {
+    START_TRACE();
     ucs_status_t ret;
     uct_rocm_ipc_key_t *key = (uct_rocm_ipc_key_t *)rkey;
 
@@ -197,7 +210,7 @@ ucs_status_t uct_rocm_ipc_ep_put_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, siz
                       uct_iov_total_length(iov, iovcnt));
     uct_rocm_ipc_trace_data(remote_addr, rkey, "PUT_ZCOPY [length %zu]",
                             uct_iov_total_length(iov, iovcnt));
-
+    STOP_TRACE();
     return ret;
 }
 
@@ -205,6 +218,7 @@ ucs_status_t uct_rocm_ipc_ep_get_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, siz
                                        uint64_t remote_addr, uct_rkey_t rkey,
                                        uct_completion_t *comp)
 {
+    START_TRACE();
     ucs_status_t ret;
     uct_rocm_ipc_key_t *key = (uct_rocm_ipc_key_t *)rkey;
 
@@ -214,6 +228,6 @@ ucs_status_t uct_rocm_ipc_ep_get_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, siz
                       uct_iov_total_length(iov, iovcnt));
     uct_rocm_ipc_trace_data(remote_addr, rkey, "GET_ZCOPY [length %zu]",
                             uct_iov_total_length(iov, iovcnt));
-
+    STOP_TRACE();
     return ret;
 }

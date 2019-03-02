@@ -263,6 +263,7 @@ static ucp_tl_alias_t ucp_tl_aliases[] = {
 ucs_status_t ucp_config_read(const char *env_prefix, const char *filename,
                              ucp_config_t **config_p)
 {
+    START_TRACE();
     ucp_config_t *config;
     ucs_status_t status;
 
@@ -279,31 +280,40 @@ ucs_status_t ucp_config_read(const char *env_prefix, const char *filename,
     }
 
     *config_p = config;
+    STOP_TRACE();
     return UCS_OK;
 
 err_free:
     ucs_free(config);
 err:
+    STOP_TRACE();
     return status;
 }
 
 void ucp_config_release(ucp_config_t *config)
 {
+    START_TRACE();
     ucs_config_parser_release_opts(config, ucp_config_table);
     ucs_free(config);
+    STOP_TRACE();
 }
 
 ucs_status_t ucp_config_modify(ucp_config_t *config, const char *name,
                                const char *value)
 {
-    return ucs_config_parser_set_value(config, ucp_config_table, name, value);
+    START_TRACE();
+    ucs_status_t result = ucs_config_parser_set_value(config, ucp_config_table, name, value);
+    STOP_TRACE();
+    return result;
 }
 
 void ucp_config_print(const ucp_config_t *config, FILE *stream,
                       const char *title, ucs_config_print_flags_t print_flags)
 {
+    START_TRACE();
     ucs_config_parser_print_opts(stream, title, config, ucp_config_table, NULL,
                                  print_flags);
+    STOP_TRACE();
 }
 
 /* Search str in the array. If str_suffix is specified, search for
@@ -313,6 +323,7 @@ void ucp_config_print(const ucp_config_t *config, FILE *stream,
 static uint64_t ucp_str_array_search(const char **array, unsigned array_len,
                                      const char *str, const char *str_suffix)
 {
+    START_TRACE();
     const size_t len = strlen(str);
     uint64_t result;
     const char *p;
@@ -331,14 +342,16 @@ static uint64_t ucp_str_array_search(const char **array, unsigned array_len,
             }
         }
     }
-
+    STOP_TRACE();
     return result;
 }
 
 static unsigned ucp_tl_alias_count(ucp_tl_alias_t *alias)
 {
+    START_TRACE();
     unsigned count;
     for (count = 0; alias->tls[count] != NULL; ++count);
+    STOP_TRACE();
     return count;
 }
 
@@ -346,11 +359,13 @@ static int ucp_tls_array_is_present(const char **tls, unsigned count,
                                     const char *tl_name, const char *info,
                                     uint8_t *rsc_flags, uint64_t *tl_cfg_mask)
 {
+    START_TRACE();
     uint64_t mask;
 
     if ((mask = ucp_str_array_search(tls, count, tl_name, NULL)) != 0) {
         *tl_cfg_mask |= mask;
         ucs_trace("enabling tl '%s'%s", tl_name, info);
+        STOP_TRACE();
         return 1;
     } else if ((mask = ucp_str_array_search(tls, count, tl_name, "aux")) != 0) {
         /* Search for tl names with 'aux' suffix, such tls can be
@@ -358,8 +373,10 @@ static int ucp_tls_array_is_present(const char **tls, unsigned count,
         *rsc_flags   |= UCP_TL_RSC_FLAG_AUX;
         *tl_cfg_mask |= mask;
         ucs_trace("enabling auxiliary tl '%s'%s", tl_name, info);
+        STOP_TRACE();
         return 1;
     } else {
+        STOP_TRACE();
         return 0;
     }
 }
@@ -368,10 +385,11 @@ static int ucp_config_is_tl_enabled(const char **names, unsigned count,
                                     const char *tl_name, int is_alias,
                                     uint8_t *rsc_flags, uint64_t *tl_cfg_mask)
 {
+    START_TRACE();
     char strict_name[UCT_TL_NAME_MAX + 1];
 
     snprintf(strict_name, sizeof(strict_name), "\\%s", tl_name);
-    return /* strict name, with leading \\ */
+    int result = /* strict name, with leading \\ */
            (!is_alias && ucp_tls_array_is_present(names, count, strict_name, "",
                                                   rsc_flags, tl_cfg_mask)) ||
            /* plain transport name */
@@ -380,6 +398,8 @@ static int ucp_config_is_tl_enabled(const char **names, unsigned count,
            /* all available transports */
            ucp_tls_array_is_present(names, count, UCP_RSC_CONFIG_ALL, "", rsc_flags,
                                     tl_cfg_mask);
+    STOP_TRACE();
+    return result;
 }
 
 static int ucp_is_resource_in_device_list(const uct_tl_resource_desc_t *resource,
@@ -387,6 +407,7 @@ static int ucp_is_resource_in_device_list(const uct_tl_resource_desc_t *resource
                                           uint64_t *dev_cfg_mask,
                                           uct_device_type_t dev_type)
 {
+    START_TRACE();
     uint64_t mask, exclusive_mask;
 
     /* go over the device list from the user and check (against the available resources)
@@ -410,6 +431,7 @@ static int ucp_is_resource_in_device_list(const uct_tl_resource_desc_t *resource
     }
 
     *dev_cfg_mask |= mask;
+    STOP_TRACE();
     return !!mask;
 }
 
@@ -417,6 +439,7 @@ static int ucp_is_resource_in_transports_list(const char *tl_name,
                                               const char **names, unsigned count,
                                               uint8_t *rsc_flags, uint64_t *tl_cfg_mask)
 {
+    START_TRACE();
     uint64_t dummy_mask, tmp_tl_cfg_mask;
     uint8_t tmp_rsc_flags;
     ucp_tl_alias_t *alias;
@@ -451,7 +474,7 @@ static int ucp_is_resource_in_transports_list(const char *tl_name,
             }
         }
     }
-
+    STOP_TRACE();
     return tl_enabled;
 }
 
@@ -459,6 +482,7 @@ static int ucp_is_resource_enabled(const uct_tl_resource_desc_t *resource,
                                    const ucp_config_t *config, uint8_t *rsc_flags,
                                    uint64_t dev_cfg_masks[], uint64_t *tl_cfg_mask)
 {
+    START_TRACE();
     int device_enabled, tl_enabled;
 
     /* Find the enabled devices */
@@ -477,6 +501,7 @@ static int ucp_is_resource_enabled(const uct_tl_resource_desc_t *resource,
     ucs_trace(UCT_TL_RESOURCE_DESC_FMT " is %sabled",
               UCT_TL_RESOURCE_DESC_ARG(resource),
               (device_enabled && tl_enabled) ? "en" : "dis");
+    STOP_TRACE();
     return device_enabled && tl_enabled;
 }
 
@@ -488,6 +513,7 @@ static void ucp_add_tl_resource_if_enabled(ucp_context_h context, ucp_tl_md_t *m
                                            uint64_t dev_cfg_masks[],
                                            uint64_t *tl_cfg_mask)
 {
+    START_TRACE();
     ucp_rsc_index_t dev_index, i;
 
     if (ucp_is_resource_enabled(resource, config, &rsc_flags, dev_cfg_masks,
@@ -512,6 +538,7 @@ static void ucp_add_tl_resource_if_enabled(ucp_context_h context, ucp_tl_md_t *m
         ++context->num_tls;
         ++(*num_resources_p);
     }
+    STOP_TRACE();
 }
 
 static ucs_status_t ucp_add_tl_resources(ucp_context_h context, ucp_tl_md_t *md,
@@ -521,6 +548,7 @@ static ucs_status_t ucp_add_tl_resources(ucp_context_h context, ucp_tl_md_t *md,
                                          uint64_t dev_cfg_masks[],
                                          uint64_t *tl_cfg_mask)
 {
+    START_TRACE();
     uct_tl_resource_desc_t *tl_resources;
     uct_tl_resource_desc_t sa_rsc;
     ucp_tl_resource_desc_t *tmp;
@@ -582,17 +610,20 @@ static ucs_status_t ucp_add_tl_resources(ucp_context_h context, ucp_tl_md_t *md,
 
 out_free_resources:
     uct_release_tl_resource_list(tl_resources);
+    STOP_TRACE();
     return UCS_OK;
 
 err_free_resources:
     uct_release_tl_resource_list(tl_resources);
 err:
+    STOP_TRACE();
     return status;
 }
 
 static void ucp_report_unavailable(const ucs_config_names_array_t* cfg,
                                    uint64_t mask, const char *title)
 {
+    START_TRACE();
     int i;
 
     for (i = 0; i < cfg->count; i++) {
@@ -600,22 +631,27 @@ static void ucp_report_unavailable(const ucs_config_names_array_t* cfg,
             ucs_warn("%s '%s' is not available", title, cfg->names[i]);
         }
     }
+    STOP_TRACE();
 }
 
 const char * ucp_find_tl_name_by_csum(ucp_context_t *context, uint16_t tl_name_csum)
 {
+    START_TRACE();
     ucp_tl_resource_desc_t *rsc;
 
     for (rsc = context->tl_rscs; rsc < context->tl_rscs + context->num_tls; ++rsc) {
         if (!(rsc->flags & UCP_TL_RSC_FLAG_SOCKADDR) && (rsc->tl_name_csum == tl_name_csum)) {
+            STOP_TRACE();
             return rsc->tl_rsc.tl_name;
         }
     }
+    STOP_TRACE();
     return NULL;
 }
 
 static ucs_status_t ucp_check_tl_names(ucp_context_t *context)
 {
+    START_TRACE();
     ucp_tl_resource_desc_t *rsc;
     const char *tl_name;
 
@@ -626,15 +662,18 @@ static ucs_status_t ucp_check_tl_names(ucp_context_t *context)
             ucs_error("Transports '%s' and '%s' have same checksum (0x%x), "
                       "please rename one of them to avoid collision",
                       rsc->tl_rsc.tl_name, tl_name, rsc->tl_name_csum);
+            STOP_TRACE();
             return UCS_ERR_ALREADY_EXISTS;
         }
     }
+    STOP_TRACE();
     return UCS_OK;
 }
 
 const char* ucp_tl_bitmap_str(ucp_context_h context, uint64_t tl_bitmap,
                               char *str, size_t max_str_len)
 {
+    START_TRACE();
     ucp_rsc_index_t i;
     char *p, *endp;
 
@@ -646,7 +685,7 @@ const char* ucp_tl_bitmap_str(ucp_context_h context, uint64_t tl_bitmap,
                           context->tl_rscs[i].tl_rsc.tl_name);
         p += strlen(p);
     }
-
+    STOP_TRACE();
     return str;
 }
 
@@ -673,6 +712,7 @@ static const char* ucp_feature_flag_str(unsigned feature_flag)
 const char* ucp_feature_flags_str(unsigned feature_flags, char *str,
                                   size_t max_str_len)
 {
+    START_TRACE();
     unsigned i, count;
     char *p, *endp;
 
@@ -691,12 +731,13 @@ const char* ucp_feature_flags_str(unsigned feature_flags, char *str,
         ucs_assert(max_str_len > 0);
         str[0] = '\0'; /* empty string */
     }
-
+    STOP_TRACE();
     return str;
 }
 
 static void ucp_free_resources(ucp_context_t *context)
 {
+    START_TRACE();
     ucp_rsc_index_t i;
 
     if (context->memtype_cache != NULL) {
@@ -708,10 +749,12 @@ static void ucp_free_resources(ucp_context_t *context)
         uct_md_close(context->tl_mds[i].md);
     }
     ucs_free(context->tl_mds);
+    STOP_TRACE();
 }
 
 static ucs_status_t ucp_check_resource_config(const ucp_config_t *config)
 {
+    START_TRACE();
      /* if we got here then num_resources > 0.
       * if the user's device list is empty, there is no match */
      if ((0 == config->devices[UCT_DEVICE_TYPE_NET].count) &&
@@ -720,6 +763,7 @@ static ucs_status_t ucp_check_resource_config(const ucp_config_t *config)
          (0 == config->devices[UCT_DEVICE_TYPE_SELF].count)) {
          ucs_error("The device lists are empty. Please specify the devices you would like to use "
                    "or omit the UCX_*_DEVICES so that the default will be used.");
+         STOP_TRACE();
          return UCS_ERR_NO_ELEM;
      }
 
@@ -728,16 +772,17 @@ static ucs_status_t ucp_check_resource_config(const ucp_config_t *config)
      if (0 == config->tls.count) {
          ucs_error("The TLs list is empty. Please specify the transports you would like to use "
                    "or omit the UCX_TLS so that the default will be used.");
+         STOP_TRACE();
          return UCS_ERR_NO_ELEM;
      }
-
+     STOP_TRACE();
      return UCS_OK;
 }
 
 static ucs_status_t ucp_fill_tl_md(const uct_md_resource_desc_t *md_rsc,
                                    ucp_tl_md_t *tl_md)
 {
-
+    START_TRACE();
     uct_md_config_t *md_config;
     ucs_status_t status;
 
@@ -747,6 +792,7 @@ static ucs_status_t ucp_fill_tl_md(const uct_md_resource_desc_t *md_rsc,
     /* Read MD configuration */
     status = uct_md_config_read(md_rsc->md_name, NULL, NULL, &md_config);
     if (status != UCS_OK) {
+        STOP_TRACE();
         return status;
     }
 
@@ -754,6 +800,7 @@ static ucs_status_t ucp_fill_tl_md(const uct_md_resource_desc_t *md_rsc,
     status = uct_md_open(md_rsc->md_name, md_config, &tl_md->md);
     uct_config_release(md_config);
     if (status != UCS_OK) {
+        STOP_TRACE();
         return status;
     }
 
@@ -762,21 +809,24 @@ static ucs_status_t ucp_fill_tl_md(const uct_md_resource_desc_t *md_rsc,
     status = uct_md_query(tl_md->md, &tl_md->attr);
     if (status != UCS_OK) {
         uct_md_close(tl_md->md);
+        STOP_TRACE();
         return status;
     }
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
 static void ucp_resource_config_array_str(const ucs_config_names_array_t *array,
                                           const char *title, char *buf, size_t max)
 {
+    START_TRACE();
     char *p, *endp;
     unsigned i;
 
     if (ucp_str_array_search((const char**)array->names, array->count,
                              UCP_RSC_CONFIG_ALL, NULL)) {
         strncpy(buf, "", max);
+        STOP_TRACE();
         return;
     }
 
@@ -793,11 +843,13 @@ static void ucp_resource_config_array_str(const ucs_config_names_array_t *array,
                   (i == array->count - 1) ? ' ' : ',');
         p += strlen(p);
     }
+    STOP_TRACE();
 }
 
 static void ucp_resource_config_str(const ucp_config_t *config, char *buf,
                                     size_t max)
 {
+    START_TRACE();
     int dev_type_idx;
     char *p, *endp, *devs_p;
 
@@ -823,11 +875,13 @@ static void ucp_resource_config_str(const ucp_config_t *config, char *buf,
     if (devs_p == p) {
         snprintf(p, endp - p, "all devices");
     }
+    STOP_TRACE();
 }
 
 static void ucp_fill_sockaddr_aux_tls_config(ucp_context_h context,
                                              const ucp_config_t *config)
 {
+    START_TRACE();
     const char **tl_names = (const char**)config->sockaddr_aux_tls.aux_tls;
     unsigned count = config->sockaddr_aux_tls.count;
     ucp_rsc_index_t tl_id;
@@ -845,11 +899,13 @@ static void ucp_fill_sockaddr_aux_tls_config(ucp_context_h context,
             context->config.sockaddr_aux_rscs_bitmap |= UCS_BIT(tl_id);
         }
     }
+    STOP_TRACE();
 }
 
 static ucs_status_t ucp_check_resources(ucp_context_h context,
                                         const ucp_config_t *config)
 {
+    START_TRACE();
     char info_str[128];
     ucp_rsc_index_t tl_id;
     ucp_tl_resource_desc_t *resource;
@@ -869,6 +925,7 @@ static ucs_status_t ucp_check_resources(ucp_context_h context,
     if (num_usable_tls == 0) {
         ucp_resource_config_str(config, info_str, sizeof(info_str));
         ucs_error("No usable transports/devices, asked %s", info_str);
+        STOP_TRACE();
         return UCS_ERR_NO_DEVICE;
     }
 
@@ -876,15 +933,19 @@ static ucs_status_t ucp_check_resources(ucp_context_h context,
     if (context->num_tls >= UCP_MAX_RESOURCES) {
         ucs_error("Exceeded transports/devices limit (%u requested, up to %d are supported)",
                   context->num_tls, UCP_MAX_RESOURCES);
+        STOP_TRACE();
         return UCS_ERR_EXCEEDS_LIMIT;
     }
 
-    return ucp_check_tl_names(context);
+    ucs_status_t result = ucp_check_tl_names(context);
+    STOP_TRACE();
+    return result;
 }
 
 static ucs_status_t ucp_fill_resources(ucp_context_h context,
                                        const ucp_config_t *config)
 {
+    START_TRACE();
     uint64_t dev_cfg_masks[UCT_DEVICE_TYPE_LAST] = {0};
     uint64_t tl_cfg_mask = 0;
     unsigned num_tl_resources;
@@ -999,7 +1060,7 @@ static ucs_status_t ucp_fill_resources(ucp_context_h context,
     }
 
     ucp_fill_sockaddr_aux_tls_config(context, config);
-
+    STOP_TRACE();
     return UCS_OK;
 
 err_free_context_resources:
@@ -1007,12 +1068,14 @@ err_free_context_resources:
 err_release_md_resources:
     uct_release_md_resource_list(md_rscs);
 err:
+    STOP_TRACE();
     return status;
 }
 
 static void ucp_apply_params(ucp_context_h context, const ucp_params_t *params,
                              ucp_mt_type_t mt_type)
 {
+    START_TRACE();
     if (params->field_mask & UCP_PARAM_FIELD_FEATURES) {
         context->config.features = params->features;
     } else {
@@ -1058,12 +1121,14 @@ static void ucp_apply_params(ucp_context_h context, const ucp_params_t *params,
     } else {
         context->mt_lock.mt_type = UCP_MT_TYPE_NONE;
     }
+    STOP_TRACE();
 }
 
 static ucs_status_t ucp_fill_config(ucp_context_h context,
                                     const ucp_params_t *params,
                                     const ucp_config_t *config)
 {
+    START_TRACE();
     unsigned i, num_alloc_methods, method;
     const char *method_name;
     ucs_status_t status;
@@ -1156,13 +1221,14 @@ static ucs_status_t ucp_fill_config(ucp_context_h context,
                      context->config.ext.seg_size);
         }
     }
-
+    STOP_TRACE();
     return UCS_OK;
 
 err_free:
     ucs_free(context->config.alloc_methods);
 err:
     UCP_THREAD_LOCK_FINALIZE(&context->mt_lock);
+    STOP_TRACE();
     return status;
 }
 
@@ -1182,6 +1248,7 @@ ucs_status_t ucp_init_version(unsigned api_major_version, unsigned api_minor_ver
                               const ucp_params_t *params, const ucp_config_t *config,
                               ucp_context_h *context_p)
 {
+    START_TRACE();
     unsigned major_version, minor_version, release_number;
     ucp_config_t *dfl_config = NULL;
     ucp_context_t *context;
@@ -1243,6 +1310,7 @@ ucs_status_t ucp_init_version(unsigned api_major_version, unsigned api_minor_ver
               context->config.features, context->tl_bitmap);
 
     *context_p = context;
+    STOP_TRACE();
     return UCS_OK;
 
 err_free_resources:
@@ -1256,26 +1324,31 @@ err_release_config:
         ucp_config_release(dfl_config);
     }
 err:
+    STOP_TRACE();
     return status;
 }
 
 void ucp_cleanup(ucp_context_h context)
 {
+    START_TRACE();
     ucs_mpool_cleanup(&context->rkey_mp, 1);
     ucp_free_resources(context);
     ucp_free_config(context);
     UCP_THREAD_LOCK_FINALIZE(&context->mt_lock);
     ucs_free(context);
+    STOP_TRACE();
 }
 
 void ucp_dump_payload(ucp_context_h context, char *buffer, size_t max,
                       const void *data, size_t length)
 {
+    START_TRACE();
     size_t data_size = ucs_global_opts.log_data_size;
     char *p, *endp;
     size_t offset;
 
     if (data_size == 0) {
+        STOP_TRACE();
         return;
     }
 
@@ -1291,11 +1364,13 @@ void ucp_dump_payload(ucp_context_h context, char *buffer, size_t max,
         p += strlen(p);
         ++offset;
     }
+    STOP_TRACE();
 }
 
 void ucp_context_uct_atomic_iface_flags(ucp_context_h context,
                                         ucp_tl_iface_atomic_flags_t *atomic)
 {
+    START_TRACE();
     if (context->config.features & UCP_FEATURE_AMO32) {
         atomic->atomic32.op_flags  = UCP_ATOMIC_OP_MASK;
         atomic->atomic32.fop_flags = UCP_ATOMIC_FOP_MASK;
@@ -1311,10 +1386,12 @@ void ucp_context_uct_atomic_iface_flags(ucp_context_h context,
         atomic->atomic64.op_flags  = 0;
         atomic->atomic64.fop_flags = 0;
     }
+    STOP_TRACE();
 }
 
 ucs_status_t ucp_context_query(ucp_context_h context, ucp_context_attr_t *attr)
 {
+    START_TRACE();
     if (attr->field_mask & UCP_ATTR_FIELD_REQUEST_SIZE) {
         attr->request_size = sizeof(ucp_request_t);
     }
@@ -1325,12 +1402,13 @@ ucs_status_t ucp_context_query(ucp_context_h context, ucp_context_attr_t *attr)
             attr->thread_mode = UCS_THREAD_MODE_SINGLE;
         }
     }
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
 void ucp_context_print_info(ucp_context_h context, FILE *stream)
 {
+    START_TRACE();
     ucp_rsc_index_t md_index, rsc_index;
 
     fprintf(stream, "#\n");
@@ -1355,5 +1433,5 @@ void ucp_context_print_info(ucp_context_h context, FILE *stream)
     }
 
     fprintf(stream, "#\n");
+    STOP_TRACE();
 }
-

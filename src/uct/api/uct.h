@@ -26,6 +26,11 @@
 
 BEGIN_C_DECLS
 
+void DoTrace(char const* func, int const mode);
+
+#define START_TRACE() DoTrace(__func__, 0);
+#define STOP_TRACE()  DoTrace(__func__, 1);
+
 /**
  * @defgroup UCT_API Unified Communication Transport (UCT) API
  * @{
@@ -1569,12 +1574,12 @@ ucs_status_t uct_md_mem_free(uct_md_h md, uct_mem_h memh);
 
 /**
  * @ingroup UCT_MD
- * @brief Give advice about the use of memory 
+ * @brief Give advice about the use of memory
  *
  * This routine advises the UCT about how to handle memory range beginning at
  * address and size of length bytes. This call does not influence the semantics
- * of the application, but may influence its performance. The advice may be 
- * ignored. 
+ * of the application, but may influence its performance. The advice may be
+ * ignored.
  *
  * @param [in]     md          Memory domain memory was allocated or registered on.
  * @param [in]     memh        Memory handle, as returned from @ref uct_md_mem_alloc

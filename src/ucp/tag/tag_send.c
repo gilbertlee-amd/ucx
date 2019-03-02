@@ -21,23 +21,27 @@ ucp_tag_get_rndv_threshold(const ucp_request_t *req, size_t count,
                            size_t max_iov, size_t rndv_rma_thresh,
                            size_t rndv_am_thresh)
 {
+    START_TRACE();
     switch (req->send.datatype & UCP_DATATYPE_CLASS_MASK) {
     case UCP_DATATYPE_IOV:
         if ((count > max_iov) &&
             ucp_ep_is_tag_offload_enabled(ucp_ep_config(req->send.ep))) {
             /* Make sure SW RNDV will be used, because tag offload does
              * not support multi-packet eager protocols. */
+            STOP_TRACE();
             return 1;
         }
         /* Fall through */
     case UCP_DATATYPE_CONTIG:
+        STOP_TRACE();
         return ucs_min(rndv_rma_thresh, rndv_am_thresh);
     case UCP_DATATYPE_GENERIC:
+        STOP_TRACE();
         return rndv_am_thresh;
     default:
         ucs_error("Invalid data type %lx", req->send.datatype);
     }
-
+    STOP_TRACE();
     return SIZE_MAX;
 }
 
@@ -48,6 +52,7 @@ ucp_tag_send_req(ucp_request_t *req, size_t dt_count,
                  ucp_send_callback_t cb, const ucp_proto_t *proto,
                  int enable_zcopy)
 {
+    START_TRACE();
     size_t rndv_thresh  = ucp_tag_get_rndv_threshold(req, dt_count,
                                                      msg_config->max_iov,
                                                      rndv_rma_thresh,
@@ -77,11 +82,13 @@ ucp_tag_send_req(ucp_request_t *req, size_t dt_count,
             ucs_assert(req->send.length >= rndv_thresh);
             status = ucp_tag_send_start_rndv(req);
             if (status != UCS_OK) {
+                STOP_TRACE();
                 return UCS_STATUS_PTR(status);
             }
 
             UCP_EP_STAT_TAG_OP(req->send.ep, RNDV);
         } else {
+            STOP_TRACE();
             return UCS_STATUS_PTR(status);
         }
     }
@@ -104,6 +111,7 @@ ucp_tag_send_req(ucp_request_t *req, size_t dt_count,
         if (enable_zcopy) {
             ucp_request_put(req);
         }
+        STOP_TRACE();
         return UCS_STATUS_PTR(status);
     }
 
@@ -112,6 +120,7 @@ ucp_tag_send_req(ucp_request_t *req, size_t dt_count,
     }
 
     ucs_trace_req("returning send request %p", req);
+    STOP_TRACE();
     return req + 1;
 }
 
@@ -120,6 +129,7 @@ ucp_tag_send_req_init(ucp_request_t* req, ucp_ep_h ep, const void* buffer,
                       uintptr_t datatype, size_t count, ucp_tag_t tag,
                       uint16_t flags)
 {
+    START_TRACE();
     req->flags             = flags;
     req->send.ep           = ep;
     req->send.buffer       = (void*)buffer;
@@ -133,12 +143,14 @@ ucp_tag_send_req_init(ucp_request_t* req, ucp_ep_h ep, const void* buffer,
                                req->send.length, &req->send.mem_type);
     req->send.lane         = ucp_ep_config(ep)->tag.lane;
     req->send.pending_lane = UCP_NULL_LANE;
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_tag_send_inline(ucp_ep_h ep, const void *buffer, size_t count,
                     uintptr_t datatype, ucp_tag_t tag)
 {
+    START_TRACE();
     ucs_status_t status;
     size_t length;
 
@@ -158,13 +170,14 @@ ucp_tag_send_inline(ucp_ep_h ep, const void *buffer, size_t count,
         status = uct_ep_tag_eager_short(ucp_ep_get_tag_uct_ep(ep), tag, buffer,
                                         length);
     } else {
+        STOP_TRACE();
         return UCS_ERR_NO_RESOURCE;
     }
 
     if (status != UCS_ERR_NO_RESOURCE) {
         UCP_EP_STAT_TAG_OP(ep, EAGER);
     }
-
+    STOP_TRACE();
     return status;
 }
 
@@ -174,6 +187,7 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
                  ucp_ep_h ep, const void *buffer, size_t count,
                  uintptr_t datatype, ucp_tag_t tag, ucp_send_callback_t cb)
 {
+    START_TRACE();
     ucs_status_t status;
     ucp_request_t *req;
     ucs_status_ptr_t ret;
@@ -206,6 +220,7 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_nb,
                            cb, ucp_ep_config(ep)->tag.proto, 1);
 out:
     UCP_WORKER_THREAD_CS_EXIT_CONDITIONAL(ep->worker);
+    STOP_TRACE();
     return ret;
 }
 
@@ -214,6 +229,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_send_nbr,
                  ucp_ep_h ep, const void *buffer, size_t count,
                  uintptr_t datatype, ucp_tag_t tag, void *request)
 {
+    START_TRACE();
     ucp_request_t *req = (ucp_request_t *)request - 1;
     ucs_status_t status;
     ucs_status_ptr_t ret;
@@ -229,6 +245,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_send_nbr,
                               datatype, tag);
     if (ucs_likely(status != UCS_ERR_NO_RESOURCE)) {
         UCP_WORKER_THREAD_CS_EXIT_CONDITIONAL(ep->worker);
+        STOP_TRACE();
         return status;
     }
 
@@ -242,8 +259,10 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_send_nbr,
     UCP_WORKER_THREAD_CS_EXIT_CONDITIONAL(ep->worker);
 
     if (ucs_unlikely(UCS_PTR_IS_ERR(ret))) {
+        STOP_TRACE();
         return UCS_PTR_STATUS(ret);
     }
+    STOP_TRACE();
     return UCS_INPROGRESS;
 }
 
@@ -252,6 +271,7 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_sync_nb,
                  ucp_ep_h ep, const void *buffer, size_t count,
                  uintptr_t datatype, ucp_tag_t tag, ucp_send_callback_t cb)
 {
+    START_TRACE();
     ucp_request_t *req;
     ucs_status_ptr_t ret;
     ucs_status_t status;
@@ -289,5 +309,6 @@ UCS_PROFILE_FUNC(ucs_status_ptr_t, ucp_tag_send_sync_nb,
                            cb, ucp_ep_config(ep)->tag.sync_proto, 1);
 out:
     UCP_WORKER_THREAD_CS_EXIT_CONDITIONAL(ep->worker);
+    STOP_TRACE();
     return ret;
 }

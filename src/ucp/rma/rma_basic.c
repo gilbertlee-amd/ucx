@@ -13,6 +13,7 @@
 
 static ucs_status_t ucp_rma_basic_progress_put(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req              = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep                    = req->send.ep;
     ucp_rkey_h rkey                 = req->send.rma.rkey;
@@ -66,11 +67,14 @@ static ucs_status_t ucp_rma_basic_progress_put(uct_pending_req_t *self)
                                        status);
     }
 
-    return ucp_rma_request_advance(req, packed_len, status);
+    ucs_status_t result = ucp_rma_request_advance(req, packed_len, status);
+    STOP_TRACE();
+    return result;
 }
 
 static ucs_status_t ucp_rma_basic_progress_get(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req              = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep                    = req->send.ep;
     ucp_rkey_h rkey                 = req->send.rma.rkey;
@@ -113,7 +117,9 @@ static ucs_status_t ucp_rma_basic_progress_get(uct_pending_req_t *self)
                                        UCS_INPROGRESS);
     }
 
-    return ucp_rma_request_advance(req, frag_length, status);
+    ucs_status_t result = ucp_rma_request_advance(req, frag_length, status);
+    STOP_TRACE();
+    return result;
 }
 
 ucp_rma_proto_t ucp_rma_basic_proto = {

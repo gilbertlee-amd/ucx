@@ -27,6 +27,8 @@
 static UCS_F_ALWAYS_INLINE
 int ucp_tag_is_specific_source(ucp_context_t *context, ucp_tag_t tag_mask)
 {
+    START_TRACE();
+    STOP_TRACE();
     return ((context->config.tag_sender_mask & tag_mask) ==
             context->config.tag_sender_mask);
 }
@@ -34,6 +36,8 @@ int ucp_tag_is_specific_source(ucp_context_t *context, ucp_tag_t tag_mask)
 static UCS_F_ALWAYS_INLINE
 int ucp_tag_is_match(ucp_tag_t tag, ucp_tag_t exp_tag, ucp_tag_t tag_mask)
 {
+    START_TRACE();
+    STOP_TRACE();
     /* The bits in which expected and actual tag differ, should not fall
      * inside the mask.
      */
@@ -43,6 +47,8 @@ int ucp_tag_is_match(ucp_tag_t tag, ucp_tag_t exp_tag, ucp_tag_t tag_mask)
 static UCS_F_ALWAYS_INLINE size_t
 ucp_tag_match_calc_hash(ucp_tag_t tag)
 {
+    START_TRACE();
+    STOP_TRACE();
     /* Compute two 32-bit modulo and combine their result */
     return ((uint32_t)tag % UCP_TAG_MATCH_HASH_SIZE) ^
            ((uint32_t)(tag >> 32) % UCP_TAG_MATCH_HASH_SIZE);
@@ -51,15 +57,20 @@ ucp_tag_match_calc_hash(ucp_tag_t tag)
 static UCS_F_ALWAYS_INLINE ucp_request_queue_t*
 ucp_tag_exp_get_queue_for_tag(ucp_tag_match_t *tm, ucp_tag_t tag)
 {
+    START_TRACE();
+    STOP_TRACE();
     return &tm->expected.hash[ucp_tag_match_calc_hash(tag)];
 }
 
 static UCS_F_ALWAYS_INLINE ucp_request_queue_t*
 ucp_tag_exp_get_queue(ucp_tag_match_t *tm, ucp_tag_t tag, ucp_tag_t tag_mask)
 {
+    START_TRACE();
     if (tag_mask == UCP_TAG_MASK_FULL) {
+        STOP_TRACE();
         return ucp_tag_exp_get_queue_for_tag(tm, tag);
     } else {
+        STOP_TRACE();
         return &tm->expected.wildcard;
     }
 }
@@ -67,27 +78,35 @@ ucp_tag_exp_get_queue(ucp_tag_match_t *tm, ucp_tag_t tag, ucp_tag_t tag_mask)
 static UCS_F_ALWAYS_INLINE ucp_request_queue_t*
 ucp_tag_exp_get_req_queue(ucp_tag_match_t *tm, ucp_request_t *req)
 {
-    return ucp_tag_exp_get_queue(tm, req->recv.tag.tag, req->recv.tag.tag_mask);
+    START_TRACE();
+    ucp_request_queue_t* result = ucp_tag_exp_get_queue(tm, req->recv.tag.tag, req->recv.tag.tag_mask);
+    STOP_TRACE();
+    return result;
 }
 
 static UCS_F_ALWAYS_INLINE void
 ucp_tag_exp_push(ucp_tag_match_t *tm, ucp_request_queue_t *req_queue,
                  ucp_request_t *req)
 {
+    START_TRACE();
     req->recv.tag.sn = tm->expected.sn++;
     ucs_queue_push(&req_queue->queue, &req->recv.queue);
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE void
 ucp_tag_exp_add(ucp_tag_match_t *tm, ucp_request_t *req)
 {
+    START_TRACE();
     ucp_tag_exp_push(tm, ucp_tag_exp_get_req_queue(tm, req), req);
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE void
 ucp_tag_exp_delete(ucp_request_t *req, ucp_tag_match_t *tm,
                    ucp_request_queue_t *req_queue, ucs_queue_iter_t iter)
 {
+    START_TRACE();
     if (!(req->flags & UCP_REQUEST_FLAG_OFFLOADED)) {
         --tm->expected.sw_all_count;
         --req_queue->sw_count;
@@ -96,18 +115,22 @@ ucp_tag_exp_delete(ucp_request_t *req, ucp_tag_match_t *tm,
         }
     }
     ucs_queue_del_iter(&req_queue->queue, iter);
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE ucp_request_t *
 ucp_tag_exp_search(ucp_tag_match_t *tm, ucp_tag_t tag)
 {
+    START_TRACE();
     ucp_request_queue_t *req_queue;
     ucs_queue_iter_t iter;
     ucp_request_t *req;
 
     if (ucs_unlikely(!ucs_queue_is_empty(&tm->expected.wildcard.queue))) {
         req_queue = ucp_tag_exp_get_queue_for_tag(tm, tag);
-        return ucp_tag_exp_search_all(tm, req_queue, tag);
+        ucp_request_t* result = ucp_tag_exp_search_all(tm, req_queue, tag);
+        STOP_TRACE();
+        return result;
     }
 
     /* fast path - wildcard queue is empty, search only the specific queue */
@@ -119,33 +142,42 @@ ucp_tag_exp_search(ucp_tag_match_t *tm, ucp_tag_t tag)
         if (ucp_tag_is_match(tag, req->recv.tag.tag, req->recv.tag.tag_mask)) {
             ucs_trace_req("matched received tag %"PRIx64" to req %p", tag, req);
             ucp_tag_exp_delete(req, tm, req_queue, iter);
+            STOP_TRACE();
             return req;
         }
     }
+    STOP_TRACE();
     return NULL;
 }
 
 static UCS_F_ALWAYS_INLINE ucp_tag_t ucp_rdesc_get_tag(ucp_recv_desc_t *rdesc)
 {
+    START_TRACE();
+    STOP_TRACE();
     return ((ucp_tag_hdr_t*)(rdesc + 1))->tag;
 }
 
 static UCS_F_ALWAYS_INLINE ucs_list_link_t*
 ucp_tag_unexp_get_list_for_tag(ucp_tag_match_t *tm, ucp_tag_t tag)
 {
+    START_TRACE();
+    STOP_TRACE();
     return &tm->unexpected.hash[ucp_tag_match_calc_hash(tag)];
 }
 
 static UCS_F_ALWAYS_INLINE void
 ucp_tag_unexp_remove(ucp_recv_desc_t *rdesc)
 {
+    START_TRACE();
     ucs_list_del(&rdesc->tag_list[UCP_RDESC_HASH_LIST]);
     ucs_list_del(&rdesc->tag_list[UCP_RDESC_ALL_LIST] );
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE void
 ucp_tag_unexp_recv(ucp_tag_match_t *tm, ucp_recv_desc_t *rdesc, ucp_tag_t tag)
 {
+    START_TRACE();
     ucs_list_link_t *hash_list;
 
     hash_list = ucp_tag_unexp_get_list_for_tag(tm, tag);
@@ -154,13 +186,17 @@ ucp_tag_unexp_recv(ucp_tag_match_t *tm, ucp_recv_desc_t *rdesc, ucp_tag_t tag)
 
     ucs_trace_req("unexp "UCP_RECV_DESC_FMT" tag %"PRIx64,
                   UCP_RECV_DESC_ARG(rdesc), tag);
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE ucp_recv_desc_t*
 ucp_tag_unexp_list_next(ucp_recv_desc_t *rdesc, int i_list)
 {
-    return ucs_list_next(&rdesc->tag_list[i_list], ucp_recv_desc_t,
-                         tag_list[i_list]);
+    START_TRACE();
+    ucp_recv_desc_t* result = ucs_list_next(&rdesc->tag_list[i_list], ucp_recv_desc_t,
+                                            tag_list[i_list]);
+    STOP_TRACE();
+    return result;
 }
 
 /* search unexpected queue for tag/mask, if found return the received desc,
@@ -170,18 +206,21 @@ static UCS_F_ALWAYS_INLINE ucp_recv_desc_t*
 ucp_tag_unexp_search(ucp_tag_match_t *tm, ucp_tag_t tag, uint64_t tag_mask,
                      int remove, const char *title)
 {
+    START_TRACE();
     ucp_recv_desc_t *rdesc;
     ucs_list_link_t *list;
     int i_list;
 
     /* fast check of global unexpected queue */
     if (ucs_list_is_empty(&tm->unexpected.all)) {
+        STOP_TRACE();
         return NULL;
     }
 
     if (tag_mask == UCP_TAG_MASK_FULL) {
         list = ucp_tag_unexp_get_list_for_tag(tm, tag);
         if (ucs_list_is_empty(list)) {
+            STOP_TRACE();
             return NULL;
         }
         i_list = UCP_RDESC_HASH_LIST;
@@ -203,12 +242,13 @@ ucp_tag_unexp_search(ucp_tag_match_t *tm, ucp_tag_t tag, uint64_t tag_mask,
             if (remove) {
                 ucp_tag_unexp_remove(rdesc);
             }
+            STOP_TRACE();
             return rdesc;
         }
 
         rdesc = ucp_tag_unexp_list_next(rdesc, i_list);
     } while (&rdesc->tag_list[i_list] != list);
-
+    STOP_TRACE();
     return NULL;
 }
 
@@ -220,6 +260,7 @@ static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_tag_request_process_recv_data(ucp_request_t *req, const void *data,
                                   size_t length, size_t offset, int dereg)
 {
+    START_TRACE();
     ucs_status_t status;
     int last;
 
@@ -242,8 +283,10 @@ ucp_tag_request_process_recv_data(ucp_request_t *req, const void *data,
         }
         ucp_request_complete_tag_recv(req, status);
         ucs_assert(status != UCS_INPROGRESS);
+        STOP_TRACE();
         return status;
     } else {
+        STOP_TRACE();
         return UCS_INPROGRESS;
     }
 }
@@ -252,6 +295,7 @@ static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_tag_recv_request_process_rdesc(ucp_request_t *req, ucp_recv_desc_t *rdesc,
                                    size_t offset)
 {
+    START_TRACE();
      size_t hdr_len, recv_len;
      ucs_status_t status;
 
@@ -260,12 +304,15 @@ ucp_tag_recv_request_process_rdesc(ucp_request_t *req, ucp_recv_desc_t *rdesc,
      status = ucp_tag_request_process_recv_data(req, (void*)(rdesc + 1) + hdr_len,
                                                 recv_len, offset, 0);
      ucp_recv_desc_release(rdesc);
+     STOP_TRACE();
      return status;
 }
 
 static UCS_F_ALWAYS_INLINE int
 ucp_tag_frag_match_is_unexp(ucp_tag_frag_match_t *frag_list)
 {
+    START_TRACE();
+    STOP_TRACE();
     /* Hack to reduce memory usage: instead of adding another field to specify
      * which union field is valid, assume that when the unexpected queue field
      * is valid, its ptail field could never be NULL */
@@ -276,27 +323,33 @@ static UCS_F_ALWAYS_INLINE void
 ucp_tag_frag_match_add_unexp(ucp_tag_frag_match_t *frag_list, ucp_recv_desc_t *rdesc,
                          size_t offset)
 {
+    START_TRACE();
     ucs_trace_req("unexp frag "UCP_RECV_DESC_FMT" offset %zu",
                   UCP_RECV_DESC_ARG(rdesc), offset);
     ucs_assert(ucp_tag_frag_match_is_unexp(frag_list));
     ucs_queue_push(&frag_list->unexp_q, &rdesc->tag_frag_queue);
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE void
 ucp_tag_frag_match_init_unexp(ucp_tag_frag_match_t *frag_list)
 {
+    START_TRACE();
     ucs_queue_head_init(&frag_list->unexp_q);
     ucs_assert(ucp_tag_frag_match_is_unexp(frag_list));
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE void
 ucp_tag_frag_hash_init_exp(ucp_tag_frag_match_t *frag_list, ucp_request_t *req)
 {
+    START_TRACE();
     UCS_STATIC_ASSERT(ucs_offsetof(ucp_tag_frag_match_t, unexp_q.ptail) >=
                       ucs_offsetof(ucp_tag_frag_match_t, exp_req) + sizeof(frag_list->exp_req));
     frag_list->exp_req       = req;
     frag_list->unexp_q.ptail = NULL;
     ucs_assert(!ucp_tag_frag_match_is_unexp(frag_list));
+    STOP_TRACE();
 }
 
 #endif

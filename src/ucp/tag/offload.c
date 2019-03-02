@@ -18,6 +18,7 @@
 
 int ucp_tag_offload_iface_activate(ucp_worker_iface_t *iface)
 {
+    START_TRACE();
     ucp_worker_t *worker   = iface->worker;
     ucp_context_t *context = worker->context;
 
@@ -41,25 +42,27 @@ int ucp_tag_offload_iface_activate(ucp_worker_iface_t *iface)
     iface->flags |= UCP_WORKER_IFACE_FLAG_OFFLOAD_ACTIVATED;
 
     ucs_debug("Activate tag offload iface %p", iface);
-
+    STOP_TRACE();
     return 1;
 }
 
 static UCS_F_ALWAYS_INLINE ucp_worker_iface_t*
 ucp_tag_offload_iface(ucp_worker_t *worker, ucp_tag_t tag)
 {
+    START_TRACE();
     khiter_t hash_it;
     ucp_tag_t key_tag;
 
     if (worker->num_active_ifaces == 1) {
         ucs_assert(worker->tm.offload.iface != NULL);
+        STOP_TRACE();
         return worker->tm.offload.iface;
     }
 
     key_tag = worker->context->config.tag_sender_mask & tag;
     hash_it = kh_get(ucp_tag_offload_hash, &worker->tm.offload.tag_hash,
                      key_tag);
-
+    STOP_TRACE();
     return (hash_it == kh_end(&worker->tm.offload.tag_hash)) ?
            NULL : kh_value(&worker->tm.offload.tag_hash, hash_it);
 }
@@ -67,22 +70,26 @@ ucp_tag_offload_iface(ucp_worker_t *worker, ucp_tag_t tag)
 static UCS_F_ALWAYS_INLINE void
 ucp_tag_offload_release_buf(ucp_request_t *req, int dereg)
 {
+    START_TRACE();
     if (req->recv.tag.rdesc != NULL) {
         ucs_mpool_put_inline(req->recv.tag.rdesc);
     } else if (dereg) {
         ucp_request_recv_buffer_dereg(req);
     }
+    STOP_TRACE();
 }
 
 /* Tag consumed by the transport - need to remove it from expected queue */
 UCS_PROFILE_FUNC_VOID(ucp_tag_offload_tag_consumed, (self),
                       uct_tag_context_t *self)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, recv.uct_ctx);
     ucs_queue_head_t *queue;
 
     queue = &ucp_tag_exp_get_req_queue(&req->recv.worker->tm, req)->queue;
     ucs_queue_remove(queue, &req->recv.queue);
+    STOP_TRACE();
 }
 
 /* Message is scattered to user buffer by the transport, complete the request */
@@ -91,6 +98,7 @@ UCS_PROFILE_FUNC_VOID(ucp_tag_offload_completed,
                       uct_tag_context_t *self, uct_tag_t stag,
                       uint64_t imm, size_t length, ucs_status_t status)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, recv.uct_ctx);
     ucp_eager_sync_hdr_t hdr;
 
@@ -126,6 +134,7 @@ UCS_PROFILE_FUNC_VOID(ucp_tag_offload_completed,
 out:
     --req->recv.tag.wiface->post_count;
     ucp_request_complete_tag_recv(req, status);
+    STOP_TRACE();
 }
 
 /* RNDV request matched by the transport. Need to proceed with SW based RNDV */
@@ -135,6 +144,7 @@ UCS_PROFILE_FUNC_VOID(ucp_tag_offload_rndv_cb,
                       const void *header, unsigned header_length,
                       ucs_status_t status)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, recv.uct_ctx);
 
     UCP_WORKER_STAT_TAG_OFFLOAD(req->recv.worker, MATCHED_SW_RNDV);
@@ -149,6 +159,7 @@ UCS_PROFILE_FUNC_VOID(ucp_tag_offload_rndv_cb,
     ucs_assert(header_length >= sizeof(ucp_rndv_rts_hdr_t));
     ucp_rndv_matched(req->recv.worker, req, header);
     ucp_tag_offload_release_buf(req, 0);
+    STOP_TRACE();
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_offload_unexp_rndv,
@@ -157,6 +168,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_offload_unexp_rndv,
                  unsigned hdr_length, uint64_t remote_addr, size_t length,
                  const void *rkey_buf)
 {
+    START_TRACE();
     ucp_worker_iface_t *iface = arg;
     ucp_worker_t *worker      = iface->worker;
     const void *uct_rkeys[]   = { rkey_buf };
@@ -206,14 +218,14 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_tag_offload_unexp_rndv,
      * Pass TM_THRESH value as a length to make sure tag is added to the
      * hash table if there is a need (i.e. we have several active ifaces). */
     ucp_tag_offload_unexp(iface, stag, worker->tm.offload.thresh);
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
 UCS_PROFILE_FUNC_VOID(ucp_tag_offload_cancel, (worker, req, mode),
                       ucp_worker_t *worker, ucp_request_t *req, unsigned mode)
 {
-
+    START_TRACE();START_TRACE();
     ucp_worker_iface_t *wiface = req->recv.tag.wiface;
     ucs_status_t status;
 
@@ -223,6 +235,7 @@ UCS_PROFILE_FUNC_VOID(ucp_tag_offload_cancel, (worker, req, mode),
     if (status != UCS_OK) {
         ucs_error("Failed to cancel recv in the transport: %s",
                   ucs_status_string(status));
+        STOP_TRACE();
         return;
     }
     UCP_WORKER_STAT_TAG_OFFLOAD(worker, CANCELED);
@@ -232,11 +245,13 @@ UCS_PROFILE_FUNC_VOID(ucp_tag_offload_cancel, (worker, req, mode),
         ucp_tag_offload_release_buf(req, mode & UCP_TAG_OFFLOAD_CANCEL_DEREG);
         --wiface->post_count;
     }
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE int
 ucp_tag_offload_do_post(ucp_request_t *req)
 {
+    START_TRACE();
     ucp_worker_t *worker   = req->recv.worker;
     ucp_context_t *context = worker->context;
     size_t length          = req->recv.length;
@@ -249,6 +264,7 @@ ucp_tag_offload_do_post(ucp_request_t *req)
     wiface = ucp_tag_offload_iface(worker, req->recv.tag.tag);
     if (ucs_unlikely(wiface == NULL)) {
         UCP_WORKER_STAT_TAG_OFFLOAD(worker, BLOCK_NO_IFACE);
+        STOP_TRACE();
         return UCS_ERR_NO_RESOURCE;
     }
 
@@ -271,6 +287,7 @@ ucp_tag_offload_do_post(ucp_request_t *req)
                                         &req->recv.state, req->recv.mem_type,
                                         req, UCT_MD_MEM_FLAG_HIDE_ERRORS);
         if (status != UCS_OK) {
+            STOP_TRACE();
             return status;
         }
 
@@ -280,6 +297,7 @@ ucp_tag_offload_do_post(ucp_request_t *req)
     } else {
         rdesc = ucp_worker_mpool_get(worker);
         if (rdesc == NULL) {
+            STOP_TRACE();
             return UCS_ERR_NO_MEMORY;
         }
 
@@ -304,6 +322,7 @@ ucp_tag_offload_do_post(ucp_request_t *req)
          * TODO keep registration in case SW RNDV protocol will be used */
         ucp_tag_offload_release_buf(req, 1);
         UCP_WORKER_STAT_TAG_OFFLOAD(worker, BLOCK_TAG_EXCEED);
+        STOP_TRACE();
         return status;
     }
 
@@ -313,6 +332,7 @@ ucp_tag_offload_do_post(ucp_request_t *req)
     ++wiface->post_count;
     ucs_trace_req("recv request %p (%p) was posted to transport (rsc %d)",
                   req, req + 1, wiface->rsc_index);
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -335,6 +355,7 @@ ucp_tag_offload_do_post(ucp_request_t *req)
 static UCS_F_ALWAYS_INLINE int
 ucp_tag_offload_post_sw_reqs(ucp_request_t *req, ucp_request_queue_t *req_queue)
 {
+    START_TRACE();
     ucp_worker_t *worker = req->recv.worker;
     ucs_status_t status;
     ucp_request_t *req_exp;
@@ -351,18 +372,21 @@ ucp_tag_offload_post_sw_reqs(ucp_request_t *req, ucp_request_queue_t *req_queue)
      *    the one being posted */
     if ((req->recv.length < worker->context->config.ext.tm_force_thresh) ||
         req_queue->block_count) {
+        STOP_TRACE();
         return 0;
     }
 
     wiface = ucp_tag_offload_iface(worker, req->recv.tag.tag);
     if (ucs_unlikely(wiface == NULL)) {
         UCP_WORKER_STAT_TAG_OFFLOAD(worker, BLOCK_NO_IFACE);
+        STOP_TRACE();
         return 0;
     }
 
     max_post = wiface->attr.cap.tag.recv.max_outstanding - wiface->post_count;
 
     if (req_queue->sw_count >= max_post) {
+        STOP_TRACE();
         return 0;
     }
 
@@ -373,24 +397,27 @@ ucp_tag_offload_post_sw_reqs(ucp_request_t *req, ucp_request_queue_t *req_queue)
         ucs_assert(req_exp != req);
         status = ucp_tag_offload_do_post(req_exp);
         if (status != UCS_OK) {
+            STOP_TRACE();
             return 0;
         }
         --req_queue->sw_count;
         --worker->tm.expected.sw_all_count;
     }
-
+    STOP_TRACE();
     return 1;
 }
 
 UCS_PROFILE_FUNC(int, ucp_tag_offload_post, (req, req_queue),
                  ucp_request_t *req, ucp_request_queue_t *req_queue)
 {
+    START_TRACE();
     ucp_worker_t *worker   = req->recv.worker;
     ucp_context_t *context = worker->context;
 
     if (!UCP_DT_IS_CONTIG(req->recv.datatype)) {
         /* Non-contig buffers not supported yet. */
         UCP_WORKER_STAT_TAG_OFFLOAD(worker, BLOCK_NON_CONTIG);
+        STOP_TRACE();
         return 0;
     }
 
@@ -398,29 +425,35 @@ UCS_PROFILE_FUNC(int, ucp_tag_offload_post, (req, req_queue),
         if (!ucp_tag_is_specific_source(context, req->recv.tag.tag_mask)) {
             /* Sender rank wildcard */
             UCP_WORKER_STAT_TAG_OFFLOAD(worker, BLOCK_WILDCARD);
+            STOP_TRACE();
             return 0;
         } else if (worker->tm.expected.sw_all_count) {
             /* There are some requests which must be completed in SW.
              * Do not post tags to HW until they are completed. */
             UCP_WORKER_STAT_TAG_OFFLOAD(worker, BLOCK_SW_PEND);
+            STOP_TRACE();
             return 0;
         }
     } else if (worker->tm.expected.wildcard.sw_count ||
                (req_queue->sw_count && !ucp_tag_offload_post_sw_reqs(req, req_queue))) {
         /* There are some requests which must be completed in SW */
         UCP_WORKER_STAT_TAG_OFFLOAD(worker, BLOCK_SW_PEND);
+        STOP_TRACE();
         return 0;
     }
 
     if (ucp_tag_offload_do_post(req) != UCS_OK) {
+        STOP_TRACE();
         return 0;
     }
 
+    STOP_TRACE();
     return 1;
 }
 
 static size_t ucp_tag_offload_pack_eager(void *dest, void *arg)
 {
+    START_TRACE();
     ucp_request_t *req = arg;
     size_t length;
 
@@ -428,11 +461,13 @@ static size_t ucp_tag_offload_pack_eager(void *dest, void *arg)
                          req->send.mem_type, dest, req->send.buffer,
                          &req->send.state.dt, req->send.length);
     ucs_assert(length == req->send.length);
+    STOP_TRACE();
     return length;
 }
 
 static ucs_status_t ucp_tag_offload_eager_short(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
     ucs_status_t status;
@@ -444,6 +479,7 @@ static ucs_status_t ucp_tag_offload_eager_short(uct_pending_req_t *self)
     if (status == UCS_OK) {
         ucp_request_complete_send(req, UCS_OK);
     }
+    STOP_TRACE();
     return status;
 }
 
@@ -451,6 +487,7 @@ static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_do_tag_offload_bcopy(uct_pending_req_t *self, uint64_t imm_data,
                          uct_pack_callback_t pack_cb)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
     ssize_t packed_len;
@@ -460,8 +497,10 @@ ucp_do_tag_offload_bcopy(uct_pending_req_t *self, uint64_t imm_data,
                                             req->send.tag.tag, imm_data,
                                             pack_cb, req, 0);
     if (packed_len < 0) {
+        STOP_TRACE();
         return packed_len;
     }
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -469,6 +508,7 @@ static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_do_tag_offload_zcopy(uct_pending_req_t *self, uint64_t imm_data,
                          ucp_req_complete_func_t complete)
 {
+    START_TRACE();
     ucp_request_t *req      = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t      *ep       = req->send.ep;
     ucp_dt_state_t dt_state = req->send.state.dt;
@@ -492,12 +532,13 @@ ucp_do_tag_offload_zcopy(uct_pending_req_t *self, uint64_t imm_data,
         ucp_request_send_state_advance(req, &dt_state,
                                        UCP_REQUEST_SEND_PROTO_ZCOPY_AM, status);
     }
-
+    STOP_TRACE();
     return UCS_STATUS_IS_ERR(status) ? status : UCS_OK;
 }
 
 static ucs_status_t ucp_tag_offload_eager_bcopy(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucs_status_t status = ucp_do_tag_offload_bcopy(self, 0ul,
                                                    ucp_tag_offload_pack_eager);
 
@@ -506,17 +547,22 @@ static ucs_status_t ucp_tag_offload_eager_bcopy(uct_pending_req_t *self)
         ucp_request_send_generic_dt_finish(req);
         ucp_request_complete_send(req, UCS_OK);
     }
+    STOP_TRACE();
     return status;
 }
 
 static ucs_status_t ucp_tag_offload_eager_zcopy(uct_pending_req_t *self)
 {
-    return ucp_do_tag_offload_zcopy(self, 0ul,
-                                    ucp_proto_am_zcopy_req_complete);
+    START_TRACE();
+    ucs_status_t result = ucp_do_tag_offload_zcopy(self, 0ul,
+                                                   ucp_proto_am_zcopy_req_complete);
+    STOP_TRACE();
+    return result;
 }
 
 ucs_status_t ucp_tag_offload_sw_rndv(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
     ucp_rndv_rts_hdr_t *rndv_rts_hdr;
@@ -532,20 +578,25 @@ ucs_status_t ucp_tag_offload_sw_rndv(uct_pending_req_t *self)
     rndv_rts_hdr = ucs_alloca(rndv_hdr_len);
     packed_len   = ucp_tag_rndv_rts_pack(rndv_rts_hdr, req);
     ucs_assert((rndv_rts_hdr->address != 0) || !UCP_DT_IS_CONTIG(req->send.datatype));
-    return uct_ep_tag_rndv_request(ep->uct_eps[req->send.lane], req->send.tag.tag,
-                                   rndv_rts_hdr, packed_len, 0);
+    ucs_status_t result = uct_ep_tag_rndv_request(ep->uct_eps[req->send.lane], req->send.tag.tag,
+                                                  rndv_rts_hdr, packed_len, 0);
+    STOP_TRACE();
+    return result;
 }
 
 static void ucp_tag_offload_rndv_zcopy_completion(uct_completion_t *self,
                                           ucs_status_t status)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t,
                                           send.state.uct_comp);
     ucp_proto_am_zcopy_req_complete(req, status);
+    STOP_TRACE();
 }
 
 ucs_status_t ucp_tag_offload_rndv_zcopy(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
     size_t max_iov     = ucp_ep_config(ep)->tag.eager.max_iov;
@@ -576,6 +627,7 @@ ucs_status_t ucp_tag_offload_rndv_zcopy(uct_pending_req_t *self)
                                     &rndv_hdr, sizeof(rndv_hdr), iov, iovcnt, 0,
                                     &req->send.state.uct_comp);
     if (UCS_PTR_IS_ERR(rndv_op)) {
+        STOP_TRACE();
         return UCS_PTR_STATUS(rndv_op);
     }
     ucp_request_send_state_advance(req, &dt_state,
@@ -584,11 +636,13 @@ ucs_status_t ucp_tag_offload_rndv_zcopy(uct_pending_req_t *self)
 
     req->flags                   |= UCP_REQUEST_FLAG_OFFLOADED;
     req->send.tag_offload.rndv_op = rndv_op;
+    STOP_TRACE();
     return UCS_OK;
 }
 
 void ucp_tag_offload_cancel_rndv(ucp_request_t *req)
 {
+    START_TRACE();
     ucp_ep_t *ep = req->send.ep;
     ucs_status_t status;
 
@@ -597,10 +651,12 @@ void ucp_tag_offload_cancel_rndv(ucp_request_t *req)
     if (status != UCS_OK) {
         ucs_error("Failed to cancel tag rndv op %s", ucs_status_string(status));
     }
+    STOP_TRACE();
 }
 
 ucs_status_t ucp_tag_offload_start_rndv(ucp_request_t *sreq)
 {
+    START_TRACE();
     ucs_status_t status;
     ucp_ep_t *ep = sreq->send.ep;
 
@@ -610,6 +666,7 @@ ucs_status_t ucp_tag_offload_start_rndv(ucp_request_t *sreq)
     if (UCP_DT_IS_CONTIG(sreq->send.datatype)) {
         status = ucp_request_send_buffer_reg_lane(sreq, sreq->send.lane);
         if (status != UCS_OK) {
+            STOP_TRACE();
             return status;
         }
     }
@@ -627,7 +684,7 @@ ucs_status_t ucp_tag_offload_start_rndv(ucp_request_t *sreq)
         /* offload enabled but can't be used */
         sreq->send.uct.func = ucp_tag_offload_sw_rndv;
     }
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -647,12 +704,15 @@ const ucp_proto_t ucp_tag_offload_proto = {
 static UCS_F_ALWAYS_INLINE void
 ucp_tag_offload_sync_posted(ucp_worker_t *worker, ucp_request_t *req)
 {
+    START_TRACE();
     req->send.tag_offload.ssend_tag = req->send.tag.tag;
     ucs_queue_push(&worker->tm.offload.sync_reqs, &req->send.tag_offload.queue);
+    STOP_TRACE();
 }
 
 static ucs_status_t ucp_tag_offload_eager_sync_bcopy(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req   = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_worker_t *worker = req->send.ep->worker;
     ucs_status_t status;
@@ -665,11 +725,13 @@ static ucs_status_t ucp_tag_offload_eager_sync_bcopy(uct_pending_req_t *self)
         ucp_tag_eager_sync_completion(req, UCP_REQUEST_FLAG_LOCAL_COMPLETED,
                                       UCS_OK);
     }
+    STOP_TRACE();
     return status;
 }
 
 static ucs_status_t ucp_tag_offload_eager_sync_zcopy(uct_pending_req_t *self)
 {
+    START_TRACE();
     ucp_request_t *req   = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_worker_t *worker = req->send.ep->worker;
     ucs_status_t status;
@@ -679,6 +741,7 @@ static ucs_status_t ucp_tag_offload_eager_sync_zcopy(uct_pending_req_t *self)
     if (status == UCS_OK) {
         ucp_tag_offload_sync_posted(worker, req);
     }
+    STOP_TRACE();
     return status;
 }
 

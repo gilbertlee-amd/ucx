@@ -10,6 +10,7 @@
 
 ucs_status_t ucp_tag_match_init(ucp_tag_match_t *tm)
 {
+    START_TRACE();
     size_t hash_size, bucket;
 
     hash_size = ucs_roundup_pow2(UCP_TAG_MATCH_HASH_SIZE);
@@ -22,6 +23,7 @@ ucs_status_t ucp_tag_match_init(ucp_tag_match_t *tm)
     tm->expected.hash = ucs_malloc(sizeof(*tm->expected.hash) * hash_size,
                                    "ucp_tm_exp_hash");
     if (tm->expected.hash == NULL) {
+        STOP_TRACE();
         return UCS_ERR_NO_MEMORY;
     }
 
@@ -29,6 +31,7 @@ ucs_status_t ucp_tag_match_init(ucp_tag_match_t *tm)
                                      "ucp_tm_unexp_hash");
     if (tm->unexpected.hash == NULL) {
         ucs_free(tm->expected.hash);
+        STOP_TRACE();
         return UCS_ERR_NO_MEMORY;
     }
 
@@ -46,24 +49,31 @@ ucs_status_t ucp_tag_match_init(ucp_tag_match_t *tm)
     tm->offload.zcopy_thresh = SIZE_MAX;
     tm->offload.iface        = NULL;
     tm->am.message_id        = ucs_generate_uuid(0);
+    STOP_TRACE();
     return UCS_OK;
 }
 
 void ucp_tag_match_cleanup(ucp_tag_match_t *tm)
 {
+    START_TRACE();
     kh_destroy_inplace(ucp_tag_offload_hash, &tm->offload.tag_hash);
     kh_destroy_inplace(ucp_tag_frag_hash, &tm->frag_hash);
     ucs_free(tm->unexpected.hash);
     ucs_free(tm->expected.hash);
+    STOP_TRACE();
 }
 
 int ucp_tag_unexp_is_empty(ucp_tag_match_t *tm)
 {
-    return ucs_list_is_empty(&tm->unexpected.all);
+    START_TRACE();
+    int result = ucs_list_is_empty(&tm->unexpected.all);
+    STOP_TRACE();
+    return result;
 }
 
 void ucp_tag_exp_remove(ucp_tag_match_t *tm, ucp_request_t *req)
 {
+    START_TRACE();
     ucp_request_queue_t *req_queue = ucp_tag_exp_get_req_queue(tm, req);
     ucs_queue_iter_t iter;
     ucp_request_t *qreq;
@@ -72,23 +82,29 @@ void ucp_tag_exp_remove(ucp_tag_match_t *tm, ucp_request_t *req)
         if (qreq == req) {
             ucp_tag_offload_try_cancel(req->recv.worker, req, 0);
             ucp_tag_exp_delete(req, tm, req_queue, iter);
+            STOP_TRACE();
             return;
         }
     }
 
     ucs_bug("expected request not found");
+    STOP_TRACE();
 }
 
 static inline uint64_t ucp_tag_exp_req_seq(ucs_queue_iter_t iter)
 {
-    return (*iter == NULL) ? ULONG_MAX :
+    START_TRACE();
+    uint64_t result = (*iter == NULL) ? ULONG_MAX :
            ucs_container_of(*iter, ucp_request_t, recv.queue)->recv.tag.sn;
+    STOP_TRACE();
+    return result;
 }
 
 ucp_request_t*
 ucp_tag_exp_search_all(ucp_tag_match_t *tm, ucp_request_queue_t *req_queue,
                        ucp_tag_t tag)
 {
+    START_TRACE();
     ucs_queue_head_t *hash_queue = &req_queue->queue;
     ucp_request_queue_t *queue;
     ucs_queue_iter_t hash_iter, wild_iter, *iter;
@@ -119,6 +135,7 @@ ucp_tag_exp_search_all(ucp_tag_match_t *tm, ucp_request_queue_t *req_queue,
         if (ucp_tag_is_match(tag, req->recv.tag.tag, req->recv.tag.tag_mask)) {
             ucs_trace_req("matched received tag %"PRIx64" to req %p", tag, req);
             ucp_tag_exp_delete(req, tm, queue, *iter);
+            STOP_TRACE();
             return req;
         }
 
@@ -130,12 +147,14 @@ ucp_tag_exp_search_all(ucp_tag_match_t *tm, ucp_request_queue_t *req_queue,
                 "hash_seq=%lu wild_seq=%lu", hash_sn, wild_sn);
     ucs_assert(ucs_queue_iter_end(hash_queue, hash_iter));
     ucs_assert(ucs_queue_iter_end(&tm->expected.wildcard.queue, wild_iter));
+    STOP_TRACE();
     return NULL;
 }
 
 void ucp_tag_frag_list_process_queue(ucp_tag_match_t *tm, ucp_request_t *req,
                                      uint64_t msg_id UCS_STATS_ARG(int counter_idx))
 {
+    START_TRACE();
     ucp_eager_middle_hdr_t *hdr;
     ucp_tag_frag_match_t *matchq;
     ucp_recv_desc_t *rdesc;
@@ -164,4 +183,5 @@ void ucp_tag_frag_list_process_queue(ucp_tag_match_t *tm, ucp_request_t *req,
 
     /* request not completed, put it on the hash */
     ucp_tag_frag_hash_init_exp(matchq, req);
+    STOP_TRACE();
 }
