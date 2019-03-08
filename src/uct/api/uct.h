@@ -1804,7 +1804,10 @@ ucs_status_t uct_rkey_release(const uct_rkey_bundle_t *rkey_ob);
  */
 UCT_INLINE_API unsigned uct_worker_progress(uct_worker_h worker)
 {
-    return ucs_callbackq_dispatch(&worker->progress_q);
+    //START_TRACE();
+    unsigned result = ucs_callbackq_dispatch(&worker->progress_q);
+    //STOP_TRACE();
+    return result;
 }
 
 
@@ -1839,7 +1842,10 @@ UCT_INLINE_API unsigned uct_worker_progress(uct_worker_h worker)
 UCT_INLINE_API ucs_status_t uct_iface_flush(uct_iface_h iface, unsigned flags,
                                             uct_completion_t *comp)
 {
-    return iface->ops.iface_flush(iface, flags, comp);
+    START_TRACE();
+    ucs_status_t result = iface->ops.iface_flush(iface, flags, comp);
+    STOP_TRACE();
+    return result;
 }
 
 /**
@@ -1857,7 +1863,10 @@ UCT_INLINE_API ucs_status_t uct_iface_flush(uct_iface_h iface, unsigned flags,
 
 UCT_INLINE_API ucs_status_t uct_iface_fence(uct_iface_h iface, unsigned flags)
 {
-    return iface->ops.iface_fence(iface, flags);
+    START_TRACE();
+    ucs_status_t result = iface->ops.iface_fence(iface, flags);
+    STOP_TRACE();
+    return result;
 }
 
 /**
@@ -1871,8 +1880,10 @@ UCT_INLINE_API ucs_status_t uct_iface_fence(uct_iface_h iface, unsigned flags)
  */
 UCT_INLINE_API void uct_iface_release_desc(void *desc)
 {
+    START_TRACE();
     uct_recv_desc_t *release_desc = uct_recv_desc(desc);
     release_desc->cb(release_desc, desc);
+    STOP_TRACE();
 }
 
 
@@ -1883,7 +1894,10 @@ UCT_INLINE_API void uct_iface_release_desc(void *desc)
 UCT_INLINE_API ucs_status_t uct_ep_put_short(uct_ep_h ep, const void *buffer, unsigned length,
                                              uint64_t remote_addr, uct_rkey_t rkey)
 {
-    return ep->iface->ops.ep_put_short(ep, buffer, length, remote_addr, rkey);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_put_short(ep, buffer, length, remote_addr, rkey);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -1895,7 +1909,10 @@ UCT_INLINE_API ssize_t uct_ep_put_bcopy(uct_ep_h ep, uct_pack_callback_t pack_cb
                                         void *arg, uint64_t remote_addr,
                                         uct_rkey_t rkey)
 {
-    return ep->iface->ops.ep_put_bcopy(ep, pack_cb, arg, remote_addr, rkey);
+    START_TRACE();
+    ssize_t result = ep->iface->ops.ep_put_bcopy(ep, pack_cb, arg, remote_addr, rkey);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -1933,7 +1950,10 @@ UCT_INLINE_API ucs_status_t uct_ep_put_zcopy(uct_ep_h ep,
                                              uint64_t remote_addr, uct_rkey_t rkey,
                                              uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_put_zcopy(ep, iov, iovcnt, remote_addr, rkey, comp);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_put_zcopy(ep, iov, iovcnt, remote_addr, rkey, comp);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -1944,7 +1964,10 @@ UCT_INLINE_API ucs_status_t uct_ep_put_zcopy(uct_ep_h ep,
 UCT_INLINE_API ucs_status_t uct_ep_get_short(uct_ep_h ep, void *buffer, unsigned length,
                                              uint64_t remote_addr, uct_rkey_t rkey)
 {
-    return ep->iface->ops.ep_get_short(ep, buffer, length, remote_addr, rkey);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_get_short(ep, buffer, length, remote_addr, rkey);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -1957,8 +1980,11 @@ UCT_INLINE_API ucs_status_t uct_ep_get_bcopy(uct_ep_h ep, uct_unpack_callback_t 
                                              uint64_t remote_addr, uct_rkey_t rkey,
                                              uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_get_bcopy(ep, unpack_cb, arg, length, remote_addr,
-                                       rkey, comp);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_get_bcopy(ep, unpack_cb, arg, length, remote_addr,
+                                                      rkey, comp);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -1996,7 +2022,10 @@ UCT_INLINE_API ucs_status_t uct_ep_get_zcopy(uct_ep_h ep,
                                              uint64_t remote_addr, uct_rkey_t rkey,
                                              uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_get_zcopy(ep, iov, iovcnt, remote_addr, rkey, comp);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_get_zcopy(ep, iov, iovcnt, remote_addr, rkey, comp);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2007,7 +2036,10 @@ UCT_INLINE_API ucs_status_t uct_ep_get_zcopy(uct_ep_h ep,
 UCT_INLINE_API ucs_status_t uct_ep_am_short(uct_ep_h ep, uint8_t id, uint64_t header,
                                             const void *payload, unsigned length)
 {
-    return ep->iface->ops.ep_am_short(ep, id, header, payload, length);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_am_short(ep, id, header, payload, length);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2019,7 +2051,10 @@ UCT_INLINE_API ssize_t uct_ep_am_bcopy(uct_ep_h ep, uint8_t id,
                                        uct_pack_callback_t pack_cb, void *arg,
                                        unsigned flags)
 {
-    return ep->iface->ops.ep_am_bcopy(ep, id, pack_cb, arg, flags);
+    START_TRACE();
+    ssize_t result = ep->iface->ops.ep_am_bcopy(ep, id, pack_cb, arg, flags);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2061,8 +2096,11 @@ UCT_INLINE_API ucs_status_t uct_ep_am_zcopy(uct_ep_h ep, uint8_t id,
                                             unsigned flags,
                                             uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_am_zcopy(ep, id, header, header_length, iov, iovcnt,
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_am_zcopy(ep, id, header, header_length, iov, iovcnt,
                                       flags, comp);
+    STOP_TRACE();
+    return result;
 }
 
 /**
@@ -2073,7 +2111,10 @@ UCT_INLINE_API ucs_status_t uct_ep_atomic_cswap64(uct_ep_h ep, uint64_t compare,
                                                   uint64_t remote_addr, uct_rkey_t rkey,
                                                   uint64_t *result, uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_atomic_cswap64(ep, compare, swap, remote_addr, rkey, result, comp);
+    START_TRACE();
+    ucs_status_t res = ep->iface->ops.ep_atomic_cswap64(ep, compare, swap, remote_addr, rkey, result, comp);
+    STOP_TRACE();
+    return res;
 }
 
 
@@ -2085,7 +2126,10 @@ UCT_INLINE_API ucs_status_t uct_ep_atomic_cswap32(uct_ep_h ep, uint32_t compare,
                                                   uint64_t remote_addr, uct_rkey_t rkey,
                                                   uint32_t *result, uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_atomic_cswap32(ep, compare, swap, remote_addr, rkey, result, comp);
+    START_TRACE();
+    ucs_status_t res = ep->iface->ops.ep_atomic_cswap32(ep, compare, swap, remote_addr, rkey, result, comp);
+    STOP_TRACE();
+    return res;
 }
 
 
@@ -2097,7 +2141,10 @@ UCT_INLINE_API ucs_status_t uct_ep_atomic32_post(uct_ep_h ep, uct_atomic_op_t op
                                                  uint32_t value, uint64_t remote_addr,
                                                  uct_rkey_t rkey)
 {
-    return ep->iface->ops.ep_atomic32_post(ep, opcode, value, remote_addr, rkey);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_atomic32_post(ep, opcode, value, remote_addr, rkey);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2109,7 +2156,10 @@ UCT_INLINE_API ucs_status_t uct_ep_atomic64_post(uct_ep_h ep, uct_atomic_op_t op
                                                  uint64_t value, uint64_t remote_addr,
                                                  uct_rkey_t rkey)
 {
-    return ep->iface->ops.ep_atomic64_post(ep, opcode, value, remote_addr, rkey);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_atomic64_post(ep, opcode, value, remote_addr, rkey);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2122,8 +2172,11 @@ UCT_INLINE_API ucs_status_t uct_ep_atomic32_fetch(uct_ep_h ep, uct_atomic_op_t o
                                                   uint64_t remote_addr, uct_rkey_t rkey,
                                                   uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_atomic32_fetch(ep, opcode, value, result,
+    START_TRACE();
+    ucs_status_t res = ep->iface->ops.ep_atomic32_fetch(ep, opcode, value, result,
                                             remote_addr, rkey, comp);
+    STOP_TRACE();
+    return res;
 }
 
 
@@ -2136,8 +2189,11 @@ UCT_INLINE_API ucs_status_t uct_ep_atomic64_fetch(uct_ep_h ep, uct_atomic_op_t o
                                                   uint64_t remote_addr, uct_rkey_t rkey,
                                                   uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_atomic64_fetch(ep, opcode, value, result,
+    START_TRACE();
+    ucs_status_t res = ep->iface->ops.ep_atomic64_fetch(ep, opcode, value, result,
                                             remote_addr, rkey, comp);
+    STOP_TRACE();
+    return res;
 }
 
 
@@ -2156,7 +2212,7 @@ UCT_INLINE_API ucs_status_t uct_ep_atomic64_fetch(uct_ep_h ep, uct_atomic_op_t o
  *                    until the callback is called and returns UCS_OK.
  * @param [in]  flags Reserved for future use.
  *
- * @return UCS_OK       - request added to pending queue
+ * @ucs_status_t result = UCS_OK       - request added to pending queue
  *         UCS_ERR_BUSY - request was not added to pending queue, because send
  *                        resources are available now. The user is advised to
  *                        retry.
@@ -2165,7 +2221,10 @@ UCT_INLINE_API ucs_status_t uct_ep_pending_add(uct_ep_h ep,
                                                uct_pending_req_t *req,
                                                unsigned flags)
 {
-    return ep->iface->ops.ep_pending_add(ep, req, flags);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_pending_add(ep, req, flags);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2184,7 +2243,9 @@ UCT_INLINE_API void uct_ep_pending_purge(uct_ep_h ep,
                                          uct_pending_purge_callback_t cb,
                                          void *arg)
 {
+    START_TRACE();
     ep->iface->ops.ep_pending_purge(ep, cb, arg);
+    STOP_TRACE();
 }
 
 
@@ -2219,7 +2280,10 @@ UCT_INLINE_API void uct_ep_pending_purge(uct_ep_h ep,
 UCT_INLINE_API ucs_status_t uct_ep_flush(uct_ep_h ep, unsigned flags,
                                          uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_flush(ep, flags, comp);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_flush(ep, flags, comp);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2237,7 +2301,10 @@ UCT_INLINE_API ucs_status_t uct_ep_flush(uct_ep_h ep, unsigned flags,
  */
 UCT_INLINE_API ucs_status_t uct_ep_fence(uct_ep_h ep, unsigned flags)
 {
-    return ep->iface->ops.ep_fence(ep, flags);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_fence(ep, flags);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2266,7 +2333,10 @@ UCT_INLINE_API ucs_status_t uct_ep_fence(uct_ep_h ep, unsigned flags)
 UCT_INLINE_API ucs_status_t uct_ep_tag_eager_short(uct_ep_h ep, uct_tag_t tag,
                                                    const void *data, size_t length)
 {
-    return ep->iface->ops.ep_tag_eager_short(ep, tag, data, length);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_tag_eager_short(ep, tag, data, length);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2298,7 +2368,10 @@ UCT_INLINE_API ssize_t uct_ep_tag_eager_bcopy(uct_ep_h ep, uct_tag_t tag,
                                               uct_pack_callback_t pack_cb,
                                               void *arg, unsigned flags)
 {
-    return ep->iface->ops.ep_tag_eager_bcopy(ep, tag, imm, pack_cb, arg, flags);
+    START_TRACE();
+    ssize_t result = ep->iface->ops.ep_tag_eager_bcopy(ep, tag, imm, pack_cb, arg, flags);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2346,8 +2419,11 @@ UCT_INLINE_API ucs_status_t uct_ep_tag_eager_zcopy(uct_ep_h ep, uct_tag_t tag,
                                                    unsigned flags,
                                                    uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_tag_eager_zcopy(ep, tag, imm, iov, iovcnt, flags,
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_tag_eager_zcopy(ep, tag, imm, iov, iovcnt, flags,
                                              comp);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2395,8 +2471,11 @@ UCT_INLINE_API ucs_status_ptr_t uct_ep_tag_rndv_zcopy(uct_ep_h ep, uct_tag_t tag
                                                       unsigned flags,
                                                       uct_completion_t *comp)
 {
-    return ep->iface->ops.ep_tag_rndv_zcopy(ep, tag, header, header_length,
-                                            iov, iovcnt, flags, comp);
+    START_TRACE();
+    ucs_status_ptr_t result = ep->iface->ops.ep_tag_rndv_zcopy(ep, tag, header, header_length,
+                                                               iov, iovcnt, flags, comp);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2420,7 +2499,10 @@ UCT_INLINE_API ucs_status_ptr_t uct_ep_tag_rndv_zcopy(uct_ep_h ep, uct_tag_t tag
  */
 UCT_INLINE_API ucs_status_t uct_ep_tag_rndv_cancel(uct_ep_h ep, void *op)
 {
-    return ep->iface->ops.ep_tag_rndv_cancel(ep, op);
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_tag_rndv_cancel(ep, op);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2448,8 +2530,11 @@ UCT_INLINE_API ucs_status_t uct_ep_tag_rndv_request(uct_ep_h ep, uct_tag_t tag,
                                                     unsigned header_length,
                                                     unsigned flags)
 {
-    return ep->iface->ops.ep_tag_rndv_request(ep, tag, header, header_length,
+    START_TRACE();
+    ucs_status_t result = ep->iface->ops.ep_tag_rndv_request(ep, tag, header, header_length,
                                               flags);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2490,7 +2575,10 @@ UCT_INLINE_API ucs_status_t uct_iface_tag_recv_zcopy(uct_iface_h iface,
                                                      size_t iovcnt,
                                                      uct_tag_context_t *ctx)
 {
-    return iface->ops.iface_tag_recv_zcopy(iface, tag, tag_mask, iov, iovcnt, ctx);
+    START_TRACE();
+    ucs_status_t result = iface->ops.iface_tag_recv_zcopy(iface, tag, tag_mask, iov, iovcnt, ctx);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2520,7 +2608,10 @@ UCT_INLINE_API ucs_status_t uct_iface_tag_recv_cancel(uct_iface_h iface,
                                                       uct_tag_context_t *ctx,
                                                       int force)
 {
-    return iface->ops.iface_tag_recv_cancel(iface, ctx, force);
+    START_TRACE();
+    ucs_status_t result = iface->ops.iface_tag_recv_cancel(iface, ctx, force);
+    STOP_TRACE();
+    return result;
 }
 
 
@@ -2544,7 +2635,9 @@ UCT_INLINE_API ucs_status_t uct_iface_tag_recv_cancel(uct_iface_h iface,
  */
 UCT_INLINE_API void uct_iface_progress_enable(uct_iface_h iface, unsigned flags)
 {
+    START_TRACE();
     iface->ops.iface_progress_enable(iface, flags);
+    STOP_TRACE();
 }
 
 
@@ -2569,7 +2662,9 @@ UCT_INLINE_API void uct_iface_progress_enable(uct_iface_h iface, unsigned flags)
  */
 UCT_INLINE_API void uct_iface_progress_disable(uct_iface_h iface, unsigned flags)
 {
+    START_TRACE();
     iface->ops.iface_progress_disable(iface, flags);
+    STOP_TRACE();
 }
 
 
@@ -2579,7 +2674,10 @@ UCT_INLINE_API void uct_iface_progress_disable(uct_iface_h iface, unsigned flags
  */
 UCT_INLINE_API unsigned uct_iface_progress(uct_iface_h iface)
 {
-    return iface->ops.iface_progress(iface);
+    START_TRACE();
+    unsigned result = iface->ops.iface_progress(iface);
+    STOP_TRACE();
+    return result;
 }
 
 

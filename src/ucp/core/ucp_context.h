@@ -320,12 +320,16 @@ static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_memory_type_detect_mds(ucp_context_h context, void *addr, size_t length,
                            uct_memory_type_t *mem_type_p)
 {
+    START_TRACE();
     unsigned i, md_index;
     ucm_mem_type_t ucm_mem_type;
 
     *mem_type_p = UCT_MD_MEM_TYPE_HOST;
 
     if (ucs_likely(!context->num_mem_type_mds)) {
+        fprintf(stdout, "(UCX) No additional memory types\n");
+        fflush(stdout);
+        STOP_TRACE();
         return UCS_OK;
     }
 
@@ -333,7 +337,10 @@ ucp_memory_type_detect_mds(ucp_context_h context, void *addr, size_t length,
         if (ucs_memtype_cache_lookup(context->memtype_cache, addr,
                                      length, &ucm_mem_type) == UCS_OK) {
             *mem_type_p = ucm_to_uct_mem_type_map[ucm_mem_type];
+            fprintf(stdout, "(UCX) Memory type in cache: %d\n", *mem_type_p);
+            fflush(stdout);
         }
+        STOP_TRACE();
         return UCS_OK;
     }
 
@@ -341,10 +348,13 @@ ucp_memory_type_detect_mds(ucp_context_h context, void *addr, size_t length,
         md_index = context->mem_type_tl_mds[i];
         if (uct_md_is_mem_type_owned(context->tl_mds[md_index].md, addr, length)) {
             *mem_type_p = context->tl_mds[md_index].attr.cap.mem_type;
+            fprintf(stdout, "(UCX) Memory type found: %d\n", *mem_type_p);
+            fflush(stdout);
+            STOP_TRACE();
             return UCS_OK;
         }
     }
-
+    STOP_TRACE();
     return UCS_OK;
 }
 

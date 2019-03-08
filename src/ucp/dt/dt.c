@@ -17,6 +17,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_mem_type_unpack,
                  ucp_worker_h worker, void *buffer, const void *recv_data,
                  size_t recv_length, uct_memory_type_t mem_type)
 {
+    START_TRACE();
     ucp_ep_h ep         = worker->mem_type_ep[mem_type];
     ucp_md_map_t md_map = 0;
     ucp_lane_index_t lane;
@@ -26,6 +27,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_mem_type_unpack,
     uct_rkey_bundle_t rkey_bundle;
 
     if (recv_length == 0) {
+        STOP_TRACE();
         return UCS_OK;
     }
 
@@ -37,6 +39,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_mem_type_unpack,
                                       &rkey_bundle);
     if (status != UCS_OK) {
         ucs_error("failed to register buffer with mem type domian");
+        STOP_TRACE();
         return status;
     }
 
@@ -48,6 +51,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_mem_type_unpack,
 
     ucp_mem_type_unreg_buffers(worker, mem_type, memh,
                                &md_map, &rkey_bundle);
+    STOP_TRACE();
     return status;
 }
 
@@ -56,6 +60,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_mem_type_pack,
                  ucp_worker_h worker, void *dest, const void *src, size_t length,
                  uct_memory_type_t mem_type)
 {
+    START_TRACE();
     ucp_ep_h ep         = worker->mem_type_ep[mem_type];
     ucp_md_map_t md_map = 0;
     ucp_lane_index_t lane;
@@ -65,6 +70,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_mem_type_pack,
     uct_rkey_bundle_t rkey_bundle;
 
     if (length == 0) {
+        STOP_TRACE();
         return UCS_OK;
     }
 
@@ -75,6 +81,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_mem_type_pack,
                                       memh, &md_map, &rkey_bundle);
     if (status != UCS_OK) {
         ucs_error("failed to register buffer with mem type domian");
+        STOP_TRACE();
         return status;
     }
 
@@ -86,6 +93,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_mem_type_pack,
 
     ucp_mem_type_unreg_buffers(worker, mem_type, memh,
                                &md_map, &rkey_bundle);
+    STOP_TRACE();
     return status;
 }
 
@@ -93,10 +101,12 @@ size_t ucp_dt_pack(ucp_worker_h worker, ucp_datatype_t datatype,
                    uct_memory_type_t mem_type, void *dest, const void *src,
                    ucp_dt_state_t *state, size_t length)
 {
+    START_TRACE();
     size_t result_len = 0;
     ucp_dt_generic_t *dt;
 
     if (!length) {
+        STOP_TRACE();
         return length;
     }
 
@@ -130,5 +140,6 @@ size_t ucp_dt_pack(ucp_worker_h worker, ucp_datatype_t datatype,
     }
 
     state->offset += result_len;
+    STOP_TRACE();
     return result_len;
 }

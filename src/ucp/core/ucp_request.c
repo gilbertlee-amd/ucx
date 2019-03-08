@@ -17,23 +17,29 @@
 
 int ucp_request_is_completed(void *request)
 {
+    START_TRACE();
     ucp_request_t *req = (ucp_request_t*)request - 1;
+    STOP_TRACE();
     return !!(req->flags & UCP_REQUEST_FLAG_COMPLETED);
 }
 
 ucs_status_t ucp_request_check_status(void *request)
 {
+    START_TRACE();
     ucp_request_t *req = (ucp_request_t*)request - 1;
 
     if (req->flags & UCP_REQUEST_FLAG_COMPLETED) {
         ucs_assert(req->status != UCS_INPROGRESS);
+        STOP_TRACE();
         return req->status;
     }
+    STOP_TRACE();
     return UCS_INPROGRESS;
 }
 
 ucs_status_t ucp_tag_recv_request_test(void *request, ucp_tag_recv_info_t *info)
 {
+    START_TRACE();
     ucp_request_t *req   = (ucp_request_t*)request - 1;
     ucs_status_t  status = ucp_request_check_status(request);
 
@@ -41,12 +47,13 @@ ucs_status_t ucp_tag_recv_request_test(void *request, ucp_tag_recv_info_t *info)
         ucs_assert(req->flags & UCP_REQUEST_FLAG_RECV);
         *info = req->recv.tag.info;
     }
-
+    STOP_TRACE();
     return status;
 }
 
 ucs_status_t ucp_stream_recv_request_test(void *request, size_t *length_p)
 {
+    START_TRACE();
     ucp_request_t *req   = (ucp_request_t*)request - 1;
     ucs_status_t  status = ucp_request_check_status(request);
 
@@ -54,13 +61,14 @@ ucs_status_t ucp_stream_recv_request_test(void *request, size_t *length_p)
         ucs_assert(req->flags & UCP_REQUEST_FLAG_STREAM_RECV);
         *length_p = req->recv.stream.length;
     }
-
+    STOP_TRACE();
     return status;
 }
 
 static UCS_F_ALWAYS_INLINE void
 ucp_request_release_common(void *request, uint8_t cb_flag, const char *debug_name)
 {
+    START_TRACE();
     ucp_request_t *req = (ucp_request_t*)request - 1;
     ucp_worker_h UCS_V_UNUSED worker = ucs_container_of(ucs_mpool_obj_owner(req),
                                                         ucp_worker_t, req_mp);
@@ -82,26 +90,33 @@ ucp_request_release_common(void *request, uint8_t cb_flag, const char *debug_nam
     }
 
     UCP_WORKER_THREAD_CS_EXIT_CONDITIONAL(worker);
+    STOP_TRACE();
 }
 
 UCS_PROFILE_FUNC_VOID(ucp_request_release, (request), void *request)
 {
+    START_TRACE();
     /* mark request as released */
     ucp_request_release_common(request, 0, "release");
+    STOP_TRACE();
 }
 
 UCS_PROFILE_FUNC_VOID(ucp_request_free, (request), void *request)
 {
+    START_TRACE();
     /* mark request as released and disable the callback */
     ucp_request_release_common(request, UCP_REQUEST_FLAG_CALLBACK, "free");
+    STOP_TRACE();
 }
 
 UCS_PROFILE_FUNC_VOID(ucp_request_cancel, (worker, request),
                       ucp_worker_h worker, void *request)
 {
+    START_TRACE();
     ucp_request_t *req = (ucp_request_t*)request - 1;
 
     if (req->flags & UCP_REQUEST_FLAG_COMPLETED) {
+        STOP_TRACE();
         return;
     }
 
@@ -116,10 +131,12 @@ UCS_PROFILE_FUNC_VOID(ucp_request_cancel, (worker, request),
 
         UCP_WORKER_THREAD_CS_EXIT_CONDITIONAL(worker);
     }
+    STOP_TRACE();
 }
 
 static void ucp_worker_request_init_proxy(ucs_mpool_t *mp, void *obj, void *chunk)
 {
+    START_TRACE();
     ucp_worker_h worker = ucs_container_of(mp, ucp_worker_t, req_mp);
     ucp_context_h context = worker->context;
     ucp_request_t *req = obj;
@@ -127,10 +144,12 @@ static void ucp_worker_request_init_proxy(ucs_mpool_t *mp, void *obj, void *chun
     if (context->config.request.init != NULL) {
         context->config.request.init(req + 1);
     }
+    STOP_TRACE();
 }
 
 static void ucp_worker_request_fini_proxy(ucs_mpool_t *mp, void *obj)
 {
+    START_TRACE();
     ucp_worker_h worker = ucs_container_of(mp, ucp_worker_t, req_mp);
     ucp_context_h context = worker->context;
     ucp_request_t *req = obj;
@@ -138,6 +157,7 @@ static void ucp_worker_request_fini_proxy(ucs_mpool_t *mp, void *obj)
     if (context->config.request.cleanup != NULL) {
         context->config.request.cleanup(req + 1);
     }
+    STOP_TRACE();
 }
 
 ucs_mpool_ops_t ucp_request_mpool_ops = {
@@ -157,6 +177,7 @@ ucs_mpool_ops_t ucp_rndv_get_mpool_ops = {
 int ucp_request_pending_add(ucp_request_t *req, ucs_status_t *req_status,
                             unsigned pending_flags)
 {
+    START_TRACE();
     ucs_status_t status;
     uct_ep_h uct_ep;
 
@@ -170,20 +191,24 @@ int ucp_request_pending_add(ucp_request_t *req, ucs_status_t *req_status,
                        req->send.ep, req, req->send.lane, uct_ep);
         *req_status            = UCS_INPROGRESS;
         req->send.pending_lane = req->send.lane;
+        STOP_TRACE();
         return 1;
     } else if (status == UCS_ERR_BUSY) {
         /* Could not add, try to send again */
+        STOP_TRACE();
         return 0;
     }
     /* Unexpected error while adding to pending */
     ucs_assert(status != UCS_INPROGRESS);
     *req_status = status;
+    STOP_TRACE();
     return 1;
 }
 
 static void ucp_request_dt_dereg(ucp_context_t *context, ucp_dt_reg_t *dt_reg,
                                  size_t count, ucp_request_t *req_dbg)
 {
+    START_TRACE();
     size_t i;
 
     for (i = 0; i < count; ++i) {
@@ -193,6 +218,7 @@ static void ucp_request_dt_dereg(ucp_context_t *context, ucp_dt_reg_t *dt_reg,
                           dt_reg[i].memh, &dt_reg[i].md_map);
         ucs_assert(dt_reg[i].md_map == 0);
     }
+    STOP_TRACE();
 }
 
 UCS_PROFILE_FUNC(ucs_status_t, ucp_request_memory_reg,
@@ -201,6 +227,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_request_memory_reg,
                  size_t length, ucp_datatype_t datatype, ucp_dt_state_t *state,
                  uct_memory_type_t mem_type, ucp_request_t *req_dbg, unsigned uct_flags)
 {
+    START_TRACE();
     size_t iov_it, iovcnt;
     const ucp_dt_iov_t *iov;
     ucp_dt_reg_t *dt_reg;
@@ -263,6 +290,7 @@ err:
                 "failed to register user buffer datatype 0x%lx address %p len %zu:"
                 " %s", datatype, buffer, length, ucs_status_string(status));
     }
+    STOP_TRACE();
     return status;
 }
 
@@ -270,6 +298,7 @@ UCS_PROFILE_FUNC_VOID(ucp_request_memory_dereg, (context, datatype, state, req_d
                       ucp_context_t *context, ucp_datatype_t datatype,
                       ucp_dt_state_t *state, ucp_request_t *req_dbg)
 {
+    START_TRACE();
     ucs_trace_func("context=%p datatype=0x%lu state=%p", context, datatype,
                    state);
 
@@ -288,11 +317,13 @@ UCS_PROFILE_FUNC_VOID(ucp_request_memory_dereg, (context, datatype, state, req_d
     default:
         break;
     }
+    STOP_TRACE();
 }
 
 /* NOTE: deprecated */
 ucs_status_t ucp_request_test(void *request, ucp_tag_recv_info_t *info)
 {
+    START_TRACE();
     ucp_request_t *req = (ucp_request_t*)request - 1;
 
     if (req->flags & UCP_REQUEST_FLAG_COMPLETED) {
@@ -300,8 +331,10 @@ ucs_status_t ucp_request_test(void *request, ucp_tag_recv_info_t *info)
             *info = req->recv.tag.info;
         }
         ucs_assert(req->status != UCS_INPROGRESS);
+        STOP_TRACE();
         return req->status;
     }
+    STOP_TRACE();
     return UCS_INPROGRESS;
 }
 
@@ -311,14 +344,24 @@ ucp_request_send_start(ucp_request_t *req, ssize_t max_short,
                        const ucp_ep_msg_config_t* msg_config,
                        const ucp_proto_t *proto)
 {
+    START_TRACE();
     size_t       length = req->send.length;
     ucs_status_t status;
     int          multi;
+
+    fprintf(stdout, "--- For short       : <= %zd\n", max_short);
+    fprintf(stdout, "--- For bcopy_single: <= %zd (%lu - %lu)\n", msg_config->max_bcopy - proto->only_hdr_size, msg_config->max_bcopy, proto->only_hdr_size);
+    fprintf(stdout, "--- For bcopy_multi : <= %zd\n", zcopy_thresh);
+    fprintf(stdout, "--- For zcopy_single: <  %ld  && not > %lu = (%lu - %lu)\n", zcopy_max, msg_config->max_zcopy - proto->only_hdr_size, msg_config->max_zcopy, proto->only_hdr_size);
+    fprintf(stdout, "--- For zcopy_multi:  <  %lu\n", zcopy_max);
+    fflush(stdout);
 
     if ((ssize_t)length <= max_short) {
         /* short */
         req->send.uct.func = proto->contig_short;
         UCS_PROFILE_REQUEST_EVENT(req, "start_contig_short", req->send.length);
+        fprintf(stdout, "(UCX) start_contig_short\n"); fflush(stdout);
+        STOP_TRACE();
         return UCS_OK;
     } else if (length < zcopy_thresh) {
         /* bcopy */
@@ -326,13 +369,16 @@ ucp_request_send_start(ucp_request_t *req, ssize_t max_short,
         if (length <= msg_config->max_bcopy - proto->only_hdr_size) {
             req->send.uct.func   = proto->bcopy_single;
             UCS_PROFILE_REQUEST_EVENT(req, "start_bcopy_single", req->send.length);
+            fprintf(stdout, "(UCX) start_bcopy_single\n"); fflush(stdout);
         } else {
             req->send.uct.func        = proto->bcopy_multi;
             req->send.tag.message_id  = req->send.ep->worker->tm.am.message_id++;
             req->send.tag.am_bw_index = 1;
             req->send.pending_lane    = UCP_NULL_LANE;
             UCS_PROFILE_REQUEST_EVENT(req, "start_bcopy_multi", req->send.length);
+            fprintf(stdout, "(UCX) start_bcopy_multi\n"); fflush(stdout);
         }
+        STOP_TRACE();
         return UCS_OK;
     } else if (length < zcopy_max) {
         /* zcopy */
@@ -340,6 +386,7 @@ ucp_request_send_start(ucp_request_t *req, ssize_t max_short,
                                      UCP_REQUEST_SEND_PROTO_ZCOPY_AM);
         status = ucp_request_send_buffer_reg_lane(req, req->send.lane);
         if (status != UCS_OK) {
+            STOP_TRACE();
             return status;
         }
 
@@ -362,13 +409,16 @@ ucp_request_send_start(ucp_request_t *req, ssize_t max_short,
             req->send.tag.am_bw_index = 1;
             req->send.pending_lane    = UCP_NULL_LANE;
             UCS_PROFILE_REQUEST_EVENT(req, "start_zcopy_multi", req->send.length);
+            fprintf(stdout, "(UCX) start_zcopy_multi\n"); fflush(stdout);
         } else {
             req->send.uct.func   = proto->zcopy_single;
             UCS_PROFILE_REQUEST_EVENT(req, "start_zcopy_single", req->send.length);
+            fprintf(stdout, "(UCX) start_zcopy_single\n"); fflush(stdout);
         }
+        STOP_TRACE();
         return UCS_OK;
     }
-
+    STOP_TRACE();
     return UCS_ERR_NO_PROGRESS;
 }
 

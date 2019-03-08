@@ -17,7 +17,6 @@
 #include <ucs/sys/math.h>
 #include <ucm/api/ucm.h>
 
-
 static ucs_pgt_dir_t *ucs_memtype_cache_pgt_dir_alloc(const ucs_pgtable_t *pgtable)
 {
     return ucs_memalign(UCS_PGT_ENTRY_MIN_ALIGN, sizeof(ucs_pgt_dir_t),

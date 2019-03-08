@@ -58,6 +58,9 @@ ucp_tag_send_req(ucp_request_t *req, size_t dt_count,
                                                      rndv_rma_thresh,
                                                      rndv_am_thresh);
     ssize_t max_short   = ucp_proto_get_short_max(req, msg_config);
+
+    fprintf(stdout, "(UCX) rndv_thresh = %lu max_short = %zd\n", rndv_thresh, max_short);
+    fflush(stdout);
     ucs_status_t status;
     size_t zcopy_thresh;
 
@@ -76,6 +79,8 @@ ucp_tag_send_req(ucp_request_t *req, size_t dt_count,
 
     status = ucp_request_send_start(req, max_short, zcopy_thresh, rndv_thresh,
                                     dt_count, msg_config, proto);
+    fprintf(stdout, "--- Send status = %d\n", status);
+    fflush(stdout);
     if (ucs_unlikely(status != UCS_OK)) {
         if (status == UCS_ERR_NO_PROGRESS) {
             /* RMA/AM rendezvous */
@@ -160,6 +165,9 @@ ucp_tag_send_inline(ucp_ep_h ep, const void *buffer, size_t count,
 
     length = ucp_contig_dt_length(datatype, count);
 
+    fprintf(stdout, "(UCX) Length = %lu Max Eager Short: %zd  offload short %zd\n",
+            length, ucp_ep_config(ep)->tag.max_eager_short, ucp_ep_config(ep)->tag.offload.max_eager_short);
+    fflush(stdout);
     if ((ssize_t)length <= ucp_ep_config(ep)->tag.max_eager_short) {
         UCS_STATIC_ASSERT(sizeof(ucp_tag_t) == sizeof(ucp_eager_hdr_t));
         UCS_STATIC_ASSERT(sizeof(ucp_tag_t) == sizeof(uint64_t));

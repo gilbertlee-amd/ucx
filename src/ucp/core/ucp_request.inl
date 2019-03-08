@@ -164,26 +164,36 @@ static int UCS_F_ALWAYS_INLINE
 ucp_request_try_send(ucp_request_t *req, ucs_status_t *req_status,
                      unsigned pending_flags)
 {
+    START_TRACE();
     ucs_status_t status;
 
     status = req->send.uct.func(&req->send.uct);
     if (status == UCS_OK) {
         /* Completed the operation */
         *req_status = UCS_OK;
+        fprintf(stdout, "--- ucp_request_try_send complete\n"); fflush(stdout);
+        STOP_TRACE();
         return 1;
     } else if (status == UCS_INPROGRESS) {
         /* Not completed, but made progress */
+        fprintf(stdout, "--- ucp_request_try_send in progress\n"); fflush(stdout);
+        STOP_TRACE();
         return 0;
     } else if (status != UCS_ERR_NO_RESOURCE) {
         /* Unexpected error */
+        fprintf(stdout, "--- ucp_request_try_send unexpected\n"); fflush(stdout);
         ucp_request_complete_send(req, status);
         *req_status = status;
+        STOP_TRACE();
         return 1;
     }
-
+    fprintf(stdout, "--- ucp_request_try_send no resources\n"); fflush(stdout);
     /* No send resources, try to add to pending queue */
     ucs_assert(status == UCS_ERR_NO_RESOURCE);
-    return ucp_request_pending_add(req, req_status, pending_flags);
+
+    int result = ucp_request_pending_add(req, req_status, pending_flags);
+    STOP_TRACE();
+    return result;
 }
 
 /**
@@ -200,8 +210,10 @@ ucp_request_try_send(ucp_request_t *req, ucs_status_t *req_status,
 static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_request_send(ucp_request_t *req, unsigned pending_flags)
 {
+    START_TRACE();
     ucs_status_t status = UCS_ERR_NOT_IMPLEMENTED;
     while (!ucp_request_try_send(req, &status, pending_flags));
+    STOP_TRACE();
     return status;
 }
 

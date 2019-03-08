@@ -18,6 +18,7 @@ SGLIB_DEFINE_HASHED_CONTAINER_FUNCTIONS(uct_mm_remote_seg_t,
 /* send a signal to remote interface using Unix-domain socket */
 static void uct_mm_ep_signal_remote(uct_mm_ep_t *ep)
 {
+    START_TRACE();
     uct_mm_iface_t *iface = ucs_derived_of(ep->super.super.iface, uct_mm_iface_t);
     char dummy = 0;
     int ret;
@@ -36,15 +37,18 @@ static void uct_mm_ep_signal_remote(uct_mm_ep_t *ep)
                  * If the remote side is not there - ignore the error as well.
                  */
                 ucs_trace("failed to send wakeup signal: %m");
+                STOP_TRACE();
                 return;
             } else {
                 ucs_warn("failed to send wakeup signal: %m");
+                STOP_TRACE();
                 return;
             }
         } else {
             ucs_assert(ret == sizeof(dummy));
             ucs_trace("sent wakeup from socket %d to %p", iface->signal_fd,
                       (const struct sockaddr*)&ep->signal.sockaddr);
+            STOP_TRACE();
             return;
         }
     }
@@ -52,6 +56,7 @@ static void uct_mm_ep_signal_remote(uct_mm_ep_t *ep)
 
 static UCS_CLASS_INIT_FUNC(uct_mm_ep_t, const uct_ep_params_t *params)
 {
+    START_TRACE();
     uct_mm_iface_t *iface = ucs_derived_of(params->iface, uct_mm_iface_t);
     const uct_mm_iface_addr_t *addr = (const void *)params->iface_addr;
 
@@ -74,6 +79,7 @@ static UCS_CLASS_INIT_FUNC(uct_mm_ep_t, const uct_ep_params_t *params)
     if (status != UCS_OK) {
         ucs_error("failed to connect to remote peer with mm. remote mm_id: %zu",
                    addr->id);
+        STOP_TRACE();
         return status;
     }
 
@@ -101,12 +107,13 @@ static UCS_CLASS_INIT_FUNC(uct_mm_ep_t, const uct_ep_params_t *params)
     ucs_arbiter_group_init(&self->arb_group);
 
     ucs_debug("mm: ep connected: %p, to remote_shmid: %zu", self, addr->id);
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
 static UCS_CLASS_CLEANUP_FUNC(uct_mm_ep_t)
 {
+    START_TRACE();
     uct_mm_iface_t *iface = ucs_derived_of(self->super.super.iface, uct_mm_iface_t);
     ucs_status_t status;
     uct_mm_remote_seg_t *remote_seg;
@@ -131,6 +138,7 @@ static UCS_CLASS_CLEANUP_FUNC(uct_mm_ep_t)
     }
 
     uct_mm_ep_pending_purge(&self->super.super, NULL, NULL);
+    STOP_TRACE();
 }
 
 UCS_CLASS_DEFINE(uct_mm_ep_t, uct_base_ep_t)
@@ -139,6 +147,7 @@ UCS_CLASS_DEFINE_DELETE_FUNC(uct_mm_ep_t, uct_ep_t);
 
 void *uct_mm_ep_attach_remote_seg(uct_mm_ep_t *ep, uct_mm_iface_t *iface, uct_mm_fifo_element_t *elem)
 {
+    START_TRACE();
     uct_mm_remote_seg_t *remote_seg, search;
     ucs_status_t status;
 
@@ -173,7 +182,7 @@ void *uct_mm_ep_attach_remote_seg(uct_mm_ep_t *ep, uct_mm_iface_t *iface, uct_mm
         /* put the base address into the ep's hash table */
         sglib_hashed_uct_mm_remote_seg_t_add(ep->remote_segments_hash, remote_seg);
     }
-
+    STOP_TRACE();
     return remote_seg->address;
 
 }
@@ -181,6 +190,7 @@ void *uct_mm_ep_attach_remote_seg(uct_mm_ep_t *ep, uct_mm_iface_t *iface, uct_mm
 static inline ucs_status_t uct_mm_ep_get_remote_elem(uct_mm_ep_t *ep, uint64_t head,
                                                      uct_mm_fifo_element_t **elem)
 {
+    START_TRACE();
     uct_mm_iface_t *iface = ucs_derived_of(ep->super.super.iface, uct_mm_iface_t);
     uint64_t elem_index;       /* the fifo elem's index in the fifo. */
                                /* must be smaller than fifo size */
@@ -192,16 +202,19 @@ static inline ucs_status_t uct_mm_ep_get_remote_elem(uct_mm_ep_t *ep, uint64_t h
     /* try to get ownership of the head element */
     returned_val = ucs_atomic_cswap64(&ep->fifo_ctl->head, head, head+1);
     if (returned_val != head) {
+        STOP_TRACE();
         return UCS_ERR_NO_RESOURCE;
     }
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
 static inline void uct_mm_ep_update_cached_tail(uct_mm_ep_t *ep)
 {
+    START_TRACE();
     ucs_memory_cpu_load_fence();
     ep->cached_tail = ep->fifo_ctl->tail;
+    STOP_TRACE();
 }
 
 /* A common mm active message sending function.
@@ -215,6 +228,7 @@ uct_mm_ep_am_common_send(unsigned is_short, uct_mm_ep_t *ep, uct_mm_iface_t *ifa
                          const void *payload, uct_pack_callback_t pack_cb, void *arg,
                          unsigned flags)
 {
+    START_TRACE();
     uct_mm_fifo_element_t *elem;
     ucs_status_t status;
     void *base_address;
@@ -229,6 +243,7 @@ retry:
         if (!ucs_arbiter_group_is_empty(&ep->arb_group)) {
             /* pending isn't empty. don't send now to prevent out-of-order sending */
             UCS_STATS_UPDATE_COUNTER(ep->super.stats, UCT_EP_STAT_NO_RES, 1);
+            STOP_TRACE();
             return UCS_ERR_NO_RESOURCE;
         } else {
             /* pending is empty */
@@ -236,6 +251,7 @@ retry:
             uct_mm_ep_update_cached_tail(ep);
             if (!UCT_MM_EP_IS_ABLE_TO_SEND(head, ep->cached_tail, iface->config.fifo_size)) {
                 UCS_STATS_UPDATE_COUNTER(ep->super.stats, UCT_EP_STAT_NO_RES, 1);
+                STOP_TRACE();
                 return UCS_ERR_NO_RESOURCE;
             }
         }
@@ -295,8 +311,10 @@ retry:
     }
 
     if (is_short) {
+        STOP_TRACE();
         return UCS_OK;
     } else {
+        STOP_TRACE();
         return length;
     }
 }
@@ -304,6 +322,7 @@ retry:
 ucs_status_t uct_mm_ep_am_short(uct_ep_h tl_ep, uint8_t id, uint64_t header,
                                 const void *payload, unsigned length)
 {
+    START_TRACE();
     uct_mm_iface_t *iface = ucs_derived_of(tl_ep->iface, uct_mm_iface_t);
     uct_mm_ep_t *ep = ucs_derived_of(tl_ep, uct_mm_ep_t);
 
@@ -311,36 +330,46 @@ ucs_status_t uct_mm_ep_am_short(uct_ep_h tl_ep, uint8_t id, uint64_t header,
                      iface->config.fifo_elem_size - sizeof(uct_mm_fifo_element_t),
                      "am_short");
 
-    return uct_mm_ep_am_common_send(UCT_MM_AM_SHORT, ep, iface, id, length,
-                                    header, payload, NULL, NULL, 0);
+    ucs_status_t result = uct_mm_ep_am_common_send(UCT_MM_AM_SHORT, ep, iface, id, length,
+                                                   header, payload, NULL, NULL, 0);
+    STOP_TRACE();
+    return result;
 }
 
 ssize_t uct_mm_ep_am_bcopy(uct_ep_h tl_ep, uint8_t id, uct_pack_callback_t pack_cb,
                            void *arg, unsigned flags)
 {
+    START_TRACE();
     uct_mm_iface_t *iface = ucs_derived_of(tl_ep->iface, uct_mm_iface_t);
     uct_mm_ep_t *ep = ucs_derived_of(tl_ep, uct_mm_ep_t);
 
-    return uct_mm_ep_am_common_send(UCT_MM_AM_BCOPY, ep, iface, id, 0, 0, NULL,
-                                    pack_cb, arg, flags);
+    ssize_t result = uct_mm_ep_am_common_send(UCT_MM_AM_BCOPY, ep, iface, id, 0, 0, NULL,
+                                              pack_cb, arg, flags);
+    STOP_TRACE();
+    return result;
 }
 
 static inline int uct_mm_ep_has_tx_resources(uct_mm_ep_t *ep)
 {
+    START_TRACE();
     uct_mm_iface_t *iface = ucs_derived_of(ep->super.super.iface, uct_mm_iface_t);
-    return UCT_MM_EP_IS_ABLE_TO_SEND(ep->fifo_ctl->head, ep->cached_tail,
-                                     iface->config.fifo_size);
+    int result = UCT_MM_EP_IS_ABLE_TO_SEND(ep->fifo_ctl->head, ep->cached_tail,
+                                           iface->config.fifo_size);
+    STOP_TRACE();
+    return result;
 }
 
 ucs_status_t uct_mm_ep_pending_add(uct_ep_h tl_ep, uct_pending_req_t *n,
                                    unsigned flags)
 {
+    START_TRACE();
     uct_mm_iface_t *iface = ucs_derived_of(tl_ep->iface, uct_mm_iface_t);
     uct_mm_ep_t *ep = ucs_derived_of(tl_ep, uct_mm_ep_t);
 
     /* check if resources became available */
     if (uct_mm_ep_has_tx_resources(ep)) {
         ucs_assert(ucs_arbiter_group_is_empty(&ep->arb_group));
+        STOP_TRACE();
         return UCS_ERR_BUSY;
     }
 
@@ -350,7 +379,7 @@ ucs_status_t uct_mm_ep_pending_add(uct_ep_h tl_ep, uct_pending_req_t *n,
     /* add the ep's group to the arbiter */
     ucs_arbiter_group_schedule(&iface->arbiter, &ep->arb_group);
     UCT_TL_EP_STAT_PEND(&ep->super);
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -358,6 +387,7 @@ ucs_arbiter_cb_result_t uct_mm_ep_process_pending(ucs_arbiter_t *arbiter,
                                                   ucs_arbiter_elem_t *elem,
                                                   void *arg)
 {
+    START_TRACE();
     uct_pending_req_t *req = ucs_container_of(elem, uct_pending_req_t, priv);
     ucs_status_t status;
     uct_mm_ep_t *ep = ucs_container_of(ucs_arbiter_elem_group(elem), uct_mm_ep_t, arb_group);
@@ -367,6 +397,7 @@ ucs_arbiter_cb_result_t uct_mm_ep_process_pending(ucs_arbiter_t *arbiter,
     uct_mm_ep_update_cached_tail(ep);
 
     if (!uct_mm_ep_has_tx_resources(ep)) {
+        STOP_TRACE();
         return UCS_ARBITER_CB_RESULT_RESCHED_GROUP;
     }
 
@@ -376,13 +407,16 @@ ucs_arbiter_cb_result_t uct_mm_ep_process_pending(ucs_arbiter_t *arbiter,
 
     if (status == UCS_OK) {
         /* sent successfully. remove from the arbiter */
+        STOP_TRACE();
         return UCS_ARBITER_CB_RESULT_REMOVE_ELEM;
     } else if (status == UCS_INPROGRESS) {
         /* sent but not completed, keep in the arbiter */
+        STOP_TRACE();
         return UCS_ARBITER_CB_RESULT_NEXT_GROUP;
     } else {
         /* couldn't send. keep this request in the arbiter until the next time
          * this function is called */
+        STOP_TRACE();
         return UCS_ARBITER_CB_RESULT_RESCHED_GROUP;
     }
 }
@@ -391,6 +425,7 @@ static ucs_arbiter_cb_result_t uct_mm_ep_abriter_purge_cb(ucs_arbiter_t *arbiter
                                                           ucs_arbiter_elem_t *elem,
                                                           void *arg)
 {
+    START_TRACE();
     uct_pending_req_t *req = ucs_container_of(elem, uct_pending_req_t, priv);
     uct_purge_cb_args_t *cb_args    = arg;
     uct_pending_purge_callback_t cb = cb_args->cb;
@@ -401,31 +436,37 @@ static ucs_arbiter_cb_result_t uct_mm_ep_abriter_purge_cb(ucs_arbiter_t *arbiter
     } else {
         ucs_warn("ep=%p canceling user pending request %p", ep, req);
     }
+    STOP_TRACE();
     return UCS_ARBITER_CB_RESULT_REMOVE_ELEM;
 }
 
 void uct_mm_ep_pending_purge(uct_ep_h tl_ep, uct_pending_purge_callback_t cb,
                              void *arg)
 {
+    START_TRACE();
     uct_mm_iface_t *iface = ucs_derived_of(tl_ep->iface, uct_mm_iface_t);
     uct_mm_ep_t *ep = ucs_derived_of(tl_ep, uct_mm_ep_t);
     uct_purge_cb_args_t  args = {cb, arg};
 
     ucs_arbiter_group_purge(&iface->arbiter, &ep->arb_group,
                             uct_mm_ep_abriter_purge_cb, &args);
+    STOP_TRACE();
 }
 
 ucs_status_t uct_mm_ep_flush(uct_ep_h tl_ep, unsigned flags,
                              uct_completion_t *comp)
 {
+    START_TRACE();
     uct_mm_ep_t *ep = ucs_derived_of(tl_ep, uct_mm_ep_t);
 
     if (!uct_mm_ep_has_tx_resources(ep)) {
         if (!ucs_arbiter_group_is_empty(&ep->arb_group)) {
+            STOP_TRACE();
             return UCS_ERR_NO_RESOURCE;
         } else {
             uct_mm_ep_update_cached_tail(ep);
             if (!uct_mm_ep_has_tx_resources(ep)) {
+                STOP_TRACE();
                 return UCS_ERR_NO_RESOURCE;
             }
         }
@@ -433,5 +474,6 @@ ucs_status_t uct_mm_ep_flush(uct_ep_h tl_ep, unsigned flags,
 
     ucs_memory_cpu_store_fence();
     UCT_TL_EP_STAT_FLUSH(&ep->super);
+    STOP_TRACE();
     return UCS_OK;
 }

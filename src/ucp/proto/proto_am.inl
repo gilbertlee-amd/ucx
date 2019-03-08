@@ -20,6 +20,7 @@ static UCS_F_ALWAYS_INLINE ucs_status_t
 ucp_do_am_bcopy_single(uct_pending_req_t *self, uint8_t am_id,
                        uct_pack_callback_t pack_cb)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
     ssize_t packed_len;
@@ -28,9 +29,10 @@ ucp_do_am_bcopy_single(uct_pending_req_t *self, uint8_t am_id,
     packed_len     = uct_ep_am_bcopy(ep->uct_eps[req->send.lane], am_id, pack_cb,
                                      req, 0);
     if (packed_len < 0) {
+        STOP_TRACE();
         return packed_len;
     }
-
+    STOP_TRACE();
     return UCS_OK;
 }
 
@@ -42,6 +44,7 @@ ucs_status_t ucp_do_am_bcopy_multi(uct_pending_req_t *self, uint8_t am_id_first,
                                    uct_pack_callback_t pack_middle,
                                    int enable_am_bw)
 {
+    START_TRACE();
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep       = req->send.ep;
     ucs_status_t status;
@@ -79,6 +82,7 @@ ucs_status_t ucp_do_am_bcopy_multi(uct_pending_req_t *self, uint8_t am_id_first,
                        (offset + packed_len - hdr_size_middle <= req->send.length));
             if ((packed_len > 0) && (offset + packed_len - hdr_size_middle == req->send.length)) {
                 /* Last */
+                STOP_TRACE();
                 return UCS_OK;
             }
         }
@@ -92,14 +96,18 @@ ucs_status_t ucp_do_am_bcopy_multi(uct_pending_req_t *self, uint8_t am_id_first,
                     continue;
                 }
                 ucs_assert(status == UCS_INPROGRESS);
+                STOP_TRACE();
                 return UCP_STATUS_PENDING_SWITCH;
             } else {
+                STOP_TRACE();
                 return packed_len;
             }
         } else {
+            STOP_TRACE();
             return UCS_INPROGRESS;
         }
     }
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE
@@ -109,6 +117,7 @@ void ucp_dt_iov_copy_uct(ucp_context_h context, uct_iov_t *iov, size_t *iovcnt,
                          size_t length_max, ucp_md_index_t md_index,
                          ucp_mem_desc_t *mdesc)
 {
+    START_TRACE();
     size_t iov_offset, max_src_iov, src_it, dst_it;
     size_t length_it = 0;
     ucp_md_index_t memh_index;
@@ -169,6 +178,7 @@ void ucp_dt_iov_copy_uct(ucp_context_h context, uct_iov_t *iov, size_t *iovcnt,
     }
 
     state->offset += length_it;
+    STOP_TRACE();
 }
 
 static UCS_F_ALWAYS_INLINE
@@ -176,6 +186,7 @@ ucs_status_t ucp_do_am_zcopy_single(uct_pending_req_t *self, uint8_t am_id,
                                     const void *hdr, size_t hdr_size,
                                     ucp_req_complete_func_t complete)
 {
+    START_TRACE();
     ucp_request_t  *req    = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep           = req->send.ep;
     size_t max_iov         = ucp_ep_config(ep)->am.max_iov;
@@ -200,6 +211,7 @@ ucs_status_t ucp_do_am_zcopy_single(uct_pending_req_t *self, uint8_t am_id,
                                        UCP_REQUEST_SEND_PROTO_ZCOPY_AM,
                                        status);
     }
+    STOP_TRACE();
     return UCS_STATUS_IS_ERR(status) ? status : UCS_OK;
 }
 
@@ -210,6 +222,7 @@ ucs_status_t ucp_do_am_zcopy_multi(uct_pending_req_t *self, uint8_t am_id_first,
                                    const void *hdr_middle, size_t hdr_size_middle,
                                    ucp_req_complete_func_t complete, int enable_am_bw)
 {
+    START_TRACE();
     ucp_request_t *req      = ucs_container_of(self, ucp_request_t, send.uct);
     ucp_ep_t *ep            = req->send.ep;
     unsigned flag_iov_mid   = 0;
@@ -287,6 +300,7 @@ ucs_status_t ucp_do_am_zcopy_multi(uct_pending_req_t *self, uint8_t am_id_first,
                                          &req->send.state.uct_comp);
             } else if (state.offset == req->send.length) {
                 /* Empty IOVs on last stage */
+                STOP_TRACE();
                 return UCS_OK;
             } else {
                 ucs_assert(offset == state.offset);
@@ -304,12 +318,14 @@ ucs_status_t ucp_do_am_zcopy_multi(uct_pending_req_t *self, uint8_t am_id_first,
                 /* Last stage */
                 if (status == UCS_OK) {
                     complete(req, UCS_OK);
+                    STOP_TRACE();
                     return UCS_OK;
                 }
                 ucp_request_send_state_advance(req, &state,
                                                UCP_REQUEST_SEND_PROTO_ZCOPY_AM,
                                                status);
                 if (!UCS_STATUS_IS_ERR(status)) {
+                    STOP_TRACE();
                     return UCS_OK;
                 }
             }
@@ -324,13 +340,14 @@ ucs_status_t ucp_do_am_zcopy_multi(uct_pending_req_t *self, uint8_t am_id_first,
                     continue;
                 }
                 ucs_assert(status == UCS_INPROGRESS);
+                STOP_TRACE();
                 return UCS_OK;
             }
         }
         ucp_request_send_state_advance(req, &state,
                                        UCP_REQUEST_SEND_PROTO_ZCOPY_AM,
                                        status);
-
+        STOP_TRACE();
         return UCS_STATUS_IS_ERR(status) ? status : UCS_INPROGRESS;
     }
 }
@@ -340,20 +357,27 @@ ucp_proto_get_zcopy_threshold(const ucp_request_t *req,
                               const ucp_ep_msg_config_t *msg_config,
                               size_t count, size_t max_zcopy)
 {
+    START_TRACE();
     ucp_worker_h     worker;
     ucp_lane_index_t lane;
     ucp_rsc_index_t  rsc_index;
     size_t           zcopy_thresh;
 
     if (ucs_unlikely(msg_config->max_zcopy == 0)) {
+        STOP_TRACE();
         return max_zcopy;
     }
 
     if (ucs_unlikely(!UCP_MEM_IS_HOST(req->send.mem_type))) {
+        STOP_TRACE();
+        fprintf(stdout, "(UCX) Not host memory so using min of %lu and %lu (memtype = %d)\n",
+                max_zcopy, msg_config->mem_type_zcopy_thresh[req->send.mem_type], req->send.mem_type);
+        fflush(stdout);
         return ucs_min(max_zcopy, msg_config->mem_type_zcopy_thresh[req->send.mem_type]);
     }
 
     if (ucs_likely(UCP_DT_IS_CONTIG(req->send.datatype))) {
+        STOP_TRACE();
         return ucs_min(max_zcopy, msg_config->zcopy_thresh[0]);
     } else if (UCP_DT_IS_IOV(req->send.datatype)) {
         if (0 == count) {
@@ -375,13 +399,15 @@ ucp_proto_get_zcopy_threshold(const ucp_request_t *req,
                               worker->context,
                               ucp_worker_iface_get_attr(worker, rsc_index)->bandwidth);
         }
+        STOP_TRACE();
         return ucs_min(max_zcopy, zcopy_thresh);
     } else if (UCP_DT_IS_GENERIC(req->send.datatype)) {
+        STOP_TRACE();
         return max_zcopy;
     }
 
     ucs_error("Unsupported datatype");
-
+    STOP_TRACE();
     return max_zcopy;
 }
 
@@ -389,6 +415,13 @@ static UCS_F_ALWAYS_INLINE ssize_t
 ucp_proto_get_short_max(const ucp_request_t *req,
                         const ucp_ep_msg_config_t *msg_config)
 {
+    START_TRACE();
+    if (!UCP_MEM_IS_HOST(req->send.mem_type))
+    {
+        fprintf(stdout, "(UCX) Setting short limit to -1 because memory type %d is not host memory\n", req->send.mem_type);
+        fflush(stdout);
+    }
+    STOP_TRACE();
     return  (!UCP_DT_IS_CONTIG(req->send.datatype) ||
             (req->flags & UCP_REQUEST_FLAG_SYNC) ||
             (!UCP_MEM_IS_HOST(req->send.mem_type))) ?
