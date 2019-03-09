@@ -59,7 +59,7 @@ ucp_tag_send_req(ucp_request_t *req, size_t dt_count,
                                                      rndv_am_thresh);
     ssize_t max_short   = ucp_proto_get_short_max(req, msg_config);
 
-    fprintf(stdout, "(UCX) rndv_thresh = %lu max_short = %zd\n", rndv_thresh, max_short);
+    fprintf(stdout, "----- rndv_thresh = %lu max_short = %zd\n", rndv_thresh, max_short);
     fflush(stdout);
     ucs_status_t status;
     size_t zcopy_thresh;
@@ -165,7 +165,7 @@ ucp_tag_send_inline(ucp_ep_h ep, const void *buffer, size_t count,
 
     length = ucp_contig_dt_length(datatype, count);
 
-    fprintf(stdout, "(UCX) Length = %lu Max Eager Short: %zd  offload short %zd\n",
+    fprintf(stdout, "----- Length = %lu Max Eager Short: %zd  offload short %zd\n",
             length, ucp_ep_config(ep)->tag.max_eager_short, ucp_ep_config(ep)->tag.offload.max_eager_short);
     fflush(stdout);
     if ((ssize_t)length <= ucp_ep_config(ep)->tag.max_eager_short) {

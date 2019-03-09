@@ -47,9 +47,18 @@ uct_rocm_copy_ep_zcopy(uct_ep_h tl_ep,
     }
 
     if (is_put)
+    {
         memcpy((void *)remote_addr, iov->buffer, size);
+        fprintf(stdout, "--- Performing rocm_copy memcpy from %p to (remote) %p\n", iov->buffer, (void *)remote_addr);
+        fflush(stdout);
+
+    }
     else
+    {
         memcpy(iov->buffer, (void *)remote_addr, size);
+        fprintf(stdout, "--- Performing rocm_copy memcpy from (remote) %p to %p\n", (void *)remote_addr, iov->buffer);
+        fflush(stdout);
+    }
     STOP_TRACE();
     return UCS_OK;
 }
@@ -96,6 +105,9 @@ ucs_status_t uct_rocm_copy_ep_put_short(uct_ep_h tl_ep, const void *buffer,
 {
     START_TRACE();
     memcpy((void *)remote_addr, buffer, length);
+    fprintf(stdout, "--- Performing rocm_copy memcpy (put_short) from %p to (remote) %p\n", buffer, (void *)remote_addr);
+    fflush(stdout);
+
 
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), PUT, SHORT, length);
     ucs_trace_data("PUT_SHORT size %d from %p to %p",
@@ -111,6 +123,8 @@ ucs_status_t uct_rocm_copy_ep_get_short(uct_ep_h tl_ep, void *buffer,
     START_TRACE();
     /* device to host */
     memcpy(buffer, (void *)remote_addr, length);
+    fprintf(stdout, "--- Performing rocm_copy memcpy (get_short) from %p to (remote) %p\n", (void *)remote_addr, buffer);
+    fflush(stdout);
 
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), GET, SHORT, length);
     ucs_trace_data("GET_SHORT size %d from %p to %p",

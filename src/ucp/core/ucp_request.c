@@ -349,18 +349,18 @@ ucp_request_send_start(ucp_request_t *req, ssize_t max_short,
     ucs_status_t status;
     int          multi;
 
-    fprintf(stdout, "--- For short       : <= %zd\n", max_short);
-    fprintf(stdout, "--- For bcopy_single: <= %zd (%lu - %lu)\n", msg_config->max_bcopy - proto->only_hdr_size, msg_config->max_bcopy, proto->only_hdr_size);
-    fprintf(stdout, "--- For bcopy_multi : <= %zd\n", zcopy_thresh);
-    fprintf(stdout, "--- For zcopy_single: <  %ld  && not > %lu = (%lu - %lu)\n", zcopy_max, msg_config->max_zcopy - proto->only_hdr_size, msg_config->max_zcopy, proto->only_hdr_size);
-    fprintf(stdout, "--- For zcopy_multi:  <  %lu\n", zcopy_max);
+    fprintf(stdout, "----- For short       : <= %zd\n", max_short);
+    fprintf(stdout, "----- For bcopy_single: < %lu and <= %zd (%lu - %lu)\n", zcopy_thresh, msg_config->max_bcopy - proto->only_hdr_size, msg_config->max_bcopy, proto->only_hdr_size);
+    fprintf(stdout, "----- For bcopy_multi : <  %lu\n", zcopy_thresh);
+    fprintf(stdout, "----- For zcopy_single: <  %ld  && not > %lu = (%lu - %lu)\n", zcopy_max, msg_config->max_zcopy - proto->only_hdr_size, msg_config->max_zcopy, proto->only_hdr_size);
+    fprintf(stdout, "----- For zcopy_multi:  <  %lu\n", zcopy_max);
     fflush(stdout);
 
     if ((ssize_t)length <= max_short) {
         /* short */
         req->send.uct.func = proto->contig_short;
         UCS_PROFILE_REQUEST_EVENT(req, "start_contig_short", req->send.length);
-        fprintf(stdout, "(UCX) start_contig_short\n"); fflush(stdout);
+        fprintf(stdout, "----- start_contig_short\n"); fflush(stdout);
         STOP_TRACE();
         return UCS_OK;
     } else if (length < zcopy_thresh) {
@@ -369,14 +369,14 @@ ucp_request_send_start(ucp_request_t *req, ssize_t max_short,
         if (length <= msg_config->max_bcopy - proto->only_hdr_size) {
             req->send.uct.func   = proto->bcopy_single;
             UCS_PROFILE_REQUEST_EVENT(req, "start_bcopy_single", req->send.length);
-            fprintf(stdout, "(UCX) start_bcopy_single\n"); fflush(stdout);
+            fprintf(stdout, "----- start_bcopy_single\n"); fflush(stdout);
         } else {
             req->send.uct.func        = proto->bcopy_multi;
             req->send.tag.message_id  = req->send.ep->worker->tm.am.message_id++;
             req->send.tag.am_bw_index = 1;
             req->send.pending_lane    = UCP_NULL_LANE;
             UCS_PROFILE_REQUEST_EVENT(req, "start_bcopy_multi", req->send.length);
-            fprintf(stdout, "(UCX) start_bcopy_multi\n"); fflush(stdout);
+            fprintf(stdout, "----- start_bcopy_multi\n"); fflush(stdout);
         }
         STOP_TRACE();
         return UCS_OK;
@@ -409,11 +409,11 @@ ucp_request_send_start(ucp_request_t *req, ssize_t max_short,
             req->send.tag.am_bw_index = 1;
             req->send.pending_lane    = UCP_NULL_LANE;
             UCS_PROFILE_REQUEST_EVENT(req, "start_zcopy_multi", req->send.length);
-            fprintf(stdout, "(UCX) start_zcopy_multi\n"); fflush(stdout);
+            fprintf(stdout, "----- start_zcopy_multi\n"); fflush(stdout);
         } else {
             req->send.uct.func   = proto->zcopy_single;
             UCS_PROFILE_REQUEST_EVENT(req, "start_zcopy_single", req->send.length);
-            fprintf(stdout, "(UCX) start_zcopy_single\n"); fflush(stdout);
+            fprintf(stdout, "----- start_zcopy_single\n"); fflush(stdout);
         }
         STOP_TRACE();
         return UCS_OK;
